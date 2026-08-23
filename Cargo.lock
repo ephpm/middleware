@@ -234,6 +234,7 @@ version = "0.1.0"
 dependencies = [
  "ephpm-middleware",
  "ephpm-middleware-modules",
+ "serde_json",
 ]
 
 [[package]]
