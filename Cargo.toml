@@ -36,6 +36,9 @@ ipnetwork = "0.21"
 hmac = "0.12"
 sha2 = "0.10"
 base64ct = { version = "1", features = ["alloc"] }
+# api-key: constant-time key comparison to close the timing oracle a naive `==`
+# would open. Tiny, no_std, no transitive deps.
+subtle = "2"
 
 # Release-profile tuning. `panic = "abort"` is DELIBERATELY NOT set: the
 # `declare!` glue in `ephpm-middleware` uses `catch_unwind` to fail CLOSED on a

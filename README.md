@@ -20,6 +20,7 @@ for the operator view and chain semantics.
 
 | Module (short name) | Crate | What it does |
 |---------------------|-------|--------------|
+| `api-key` | `ephpm-middleware-api-key` | Validate an API key (header, optionally query param) against a static map or KV lookup; forward the resolved consumer id to PHP (constant-time compare; `401` otherwise). |
 | `jwt` | `ephpm-middleware-jwt` | Validate HS256 bearer tokens before PHP runs (constant-time HMAC; `alg` pinned; `exp` required). |
 | `cors` | `ephpm-middleware-cors` | Answer CORS preflights directly (`204`), append `Access-Control-*` to cross-origin responses. |
 | `ratelimit` | `ephpm-middleware-ratelimit` | Fixed-window per-client rate limiting over the embedded KV store (`429` + `Retry-After`). |
@@ -93,6 +94,7 @@ crates/
                                       C ABI exports (so they can all be linked
                                       into one binary — the cdylib shells, or
                                       ePHPm's `vendor-middleware` feature)
+  ephpm-middleware-api-key            cdylib shell: pub use + declare!(ApiKey)
   ephpm-middleware-jwt                cdylib shell: pub use + declare!(Jwt)
   ephpm-middleware-cors               cdylib shell
   ephpm-middleware-ratelimit          cdylib shell

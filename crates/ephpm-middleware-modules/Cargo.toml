@@ -25,6 +25,8 @@ base64ct.workspace = true
 # no transitive deps beyond `serde` (which we do not enable). std handles IP
 # parsing; ipnetwork only does the network-membership test.
 ipnetwork.workspace = true
+# api-key: constant-time key comparison (no_std, no transitive deps).
+subtle.workspace = true
 
 [dev-dependencies]
 # `host` gives the tests `RequestCtx` / `host_table` to fabricate a request,

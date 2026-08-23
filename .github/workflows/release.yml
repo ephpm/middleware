@@ -87,6 +87,7 @@ jobs:
           # Master module list — short name ↔ crate. Single source of truth for
           # asset naming; the CLI mirrors these short names.
           all_modules='[
+            {"short":"api-key",          "crate":"ephpm-middleware-api-key"},
             {"short":"jwt",              "crate":"ephpm-middleware-jwt"},
             {"short":"cors",             "crate":"ephpm-middleware-cors"},
             {"short":"ratelimit",        "crate":"ephpm-middleware-ratelimit"},

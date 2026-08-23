@@ -17,6 +17,7 @@
 //! symbols collide at link time — which is exactly why the implementations
 //! live here.
 
+pub mod api_key;
 pub mod cors;
 pub mod ip_allowlist;
 pub mod jwt;
