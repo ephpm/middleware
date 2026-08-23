@@ -25,6 +25,7 @@ for the operator view and chain semantics.
 | `ratelimit` | `ephpm-middleware-ratelimit` | Fixed-window per-client rate limiting over the embedded KV store (`429` + `Retry-After`). |
 | `security-headers` | `ephpm-middleware-security-headers` | Append standard security response headers (HSTS, CSP, `X-Frame-Options`, …). |
 | `maintenance-mode` | `ephpm-middleware-maintenance-mode` | Flip a tenant into a `503` holding page via a per-site KV flag — no redeploy (`Retry-After`; IP/path bypass; fails **open**). |
+| `ip-allowlist` | `ephpm-middleware-ip-allowlist` | Allow/deny requests by client IP against CIDR lists, fail-closed (`403`); deny beats allow. |
 
 Per-module configuration keys are documented in each crate's module docs
 (`crates/ephpm-middleware-<name>/src/lib.rs` re-exports the implementation from
@@ -88,7 +89,7 @@ neither).
 
 ```
 crates/
-  ephpm-middleware-modules            rlib: the four impls as plain types, NO
+  ephpm-middleware-modules            rlib: the module impls as plain types, NO
                                       C ABI exports (so they can all be linked
                                       into one binary — the cdylib shells, or
                                       ePHPm's `vendor-middleware` feature)
@@ -97,6 +98,7 @@ crates/
   ephpm-middleware-ratelimit          cdylib shell
   ephpm-middleware-security-headers   cdylib shell
   ephpm-middleware-maintenance-mode   cdylib shell
+  ephpm-middleware-ip-allowlist       cdylib shell
 ```
 
 The impl/shell split is deliberate: multiple crates each exporting the same

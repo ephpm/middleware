@@ -18,6 +18,7 @@
 //! live here.
 
 pub mod cors;
+pub mod ip_allowlist;
 pub mod jwt;
 pub mod maintenance_mode;
 pub mod ratelimit;

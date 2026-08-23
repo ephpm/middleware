@@ -91,7 +91,8 @@ jobs:
             {"short":"cors",             "crate":"ephpm-middleware-cors"},
             {"short":"ratelimit",        "crate":"ephpm-middleware-ratelimit"},
             {"short":"security-headers", "crate":"ephpm-middleware-security-headers"},
-            {"short":"maintenance-mode", "crate":"ephpm-middleware-maintenance-mode"}
+            {"short":"maintenance-mode", "crate":"ephpm-middleware-maintenance-mode"},
+            {"short":"ip-allowlist",     "crate":"ephpm-middleware-ip-allowlist"}
           ]'
 
           if [ "$ONLY_HOST" = "true" ]; then

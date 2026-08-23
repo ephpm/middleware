@@ -221,6 +221,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "ephpm-middleware-ip-allowlist"
+version = "0.1.0"
+dependencies = [
+ "ephpm-middleware",
+ "ephpm-middleware-modules",
+]
+
+[[package]]
 name = "ephpm-middleware-jwt"
 version = "0.1.0"
 dependencies = [
@@ -245,6 +253,7 @@ dependencies = [
  "ephpm-kv",
  "ephpm-middleware",
  "hmac",
+ "ipnetwork",
  "serde_json",
  "sha2",
 ]
@@ -417,6 +426,12 @@ name = "inlinable_string"
 version = "0.1.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c8fae54786f62fb2918dcfae3d568594e50eb9b5c25bf04371af6fe7516452fb"
+
+[[package]]
+name = "ipnetwork"
+version = "0.21.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cf370abdafd54d13e54a620e8c3e1145f28e46cc9d704bc6d94414559df41763"
 
 [[package]]
 name = "itoa"
