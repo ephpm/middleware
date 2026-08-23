@@ -29,6 +29,9 @@ ephpm-middleware = { git = "https://github.com/ephpm/ephpm.git", rev = "a6e53177
 ephpm-kv = { git = "https://github.com/ephpm/ephpm.git", rev = "a6e5317718dfa11ed2b7f6970996139b305eed73" }
 
 serde_json = "1"
+# ip-allowlist: CIDR parsing + membership for IPv4/IPv6. Default features only
+# (`serde` is an opt-in feature we do not enable), so no extra transitive deps.
+ipnetwork = "0.21"
 # jwt: HS256 via hmac/sha2 — no heavyweight JWT dependency.
 hmac = "0.12"
 sha2 = "0.10"

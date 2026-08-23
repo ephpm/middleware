@@ -17,6 +17,7 @@
 //! collide at link time — which is exactly why the implementations live here.
 
 pub mod cors;
+pub mod ip_allowlist;
 pub mod jwt;
 pub mod ratelimit;
 pub mod security_headers;

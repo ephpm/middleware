@@ -21,6 +21,10 @@ serde_json.workspace = true
 hmac.workspace = true
 sha2.workspace = true
 base64ct.workspace = true
+# ip-allowlist: CIDR containment for v4+v6. Tiny, widely-used, MIT/Apache-2.0,
+# no transitive deps beyond `serde` (which we do not enable). std handles IP
+# parsing; ipnetwork only does the network-membership test.
+ipnetwork.workspace = true
 
 [dev-dependencies]
 # `host` gives the tests `RequestCtx` / `host_table` to fabricate a request,
