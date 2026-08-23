@@ -1,0 +1,34 @@
+[package]
+name = "ephpm-middleware-modules"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "The four official ePHPm native middleware implementations (jwt, cors, ratelimit, security-headers) as plain Rust types — shared by the loadable cdylib shells here and by ePHPm's optional compile-time `vendor-middleware` feature"
+
+# Deliberately rlib-only and free of C ABI exports. The sibling cdylib shells
+# (`ephpm-middleware-{jwt,cors,ratelimit,security-headers}`) re-export these
+# types and add `declare!`; four crates each exporting the same
+# `ephpm_middleware_*` symbols cannot be linked into one binary, which is
+# exactly why the implementations live here. This crate is also what ePHPm's
+# off-by-default `vendor-middleware` feature git-deps to compile the modules
+# back into a fully-static (musl) binary that cannot dlopen.
+
+[dependencies]
+ephpm-middleware.workspace = true
+serde_json.workspace = true
+hmac.workspace = true
+sha2.workspace = true
+base64ct.workspace = true
+
+[dev-dependencies]
+# `host` gives the tests `RequestCtx` / `host_table` to fabricate a request,
+# and pulls in the real embedded KV store for the ratelimit tests. Dev-only —
+# resolver 3 keeps the `host` feature and `ephpm-kv` out of the shipped cdylib
+# builds, which need neither.
+ephpm-middleware = { workspace = true, features = ["host"] }
+ephpm-kv.workspace = true
+
+[lints]
+workspace = true

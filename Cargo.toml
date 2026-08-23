@@ -1,0 +1,73 @@
+[workspace]
+members = ["crates/*"]
+resolver = "3"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+# 1.88 matches the ePHPm workspace and the `ephpm-middleware` ABI crate this
+# repo depends on by git rev; cargo refuses to compile a dependency whose
+# declared rust-version exceeds the active toolchain.
+rust-version = "1.88"
+license = "MIT"
+repository = "https://github.com/ephpm/middleware"
+
+[workspace.dependencies]
+# The ePHPm native-middleware ABI + authoring kit. It lives in the ePHPm repo
+# (`crates/ephpm-middleware`) and is the shared contract between the host and
+# every module — the host side needs it too, so it is NOT vendored here. Pinned
+# by `rev` exactly like ePHPm pins litewire: a drift in `EphpmHostV1` / `ABI_V1`
+# would be silent UB at the FFI boundary, so the module is provably built
+# against one specific host-ABI commit. Bump = replace `rev` + `cargo update`.
+# The rlib of shared module implementations — re-exported by the cdylib shells.
+ephpm-middleware-modules = { path = "crates/ephpm-middleware-modules" }
+ephpm-middleware = { git = "https://github.com/ephpm/ephpm.git", rev = "a6e5317718dfa11ed2b7f6970996139b305eed73" }
+# Test-only: the same embedded KV store the host wires into the middleware host
+# table, so the ratelimit unit tests exercise the real `kv_incr_ttl` path. Same
+# rev as the ABI crate so both resolve to one crate instance and the `Store`
+# type matches `ephpm_middleware::host::set_kv_store`.
+ephpm-kv = { git = "https://github.com/ephpm/ephpm.git", rev = "a6e5317718dfa11ed2b7f6970996139b305eed73" }
+
+serde_json = "1"
+# jwt: HS256 via hmac/sha2 — no heavyweight JWT dependency.
+hmac = "0.12"
+sha2 = "0.10"
+base64ct = { version = "1", features = ["alloc"] }
+
+# Release-profile tuning. `panic = "abort"` is DELIBERATELY NOT set: the
+# `declare!` glue in `ephpm-middleware` uses `catch_unwind` to fail CLOSED on a
+# panicking `invoke` (return 500) and fail STARTUP on a panicking `init`. Under
+# `panic = "abort"` those become no-ops and any module panic kills the whole
+# host process. Keep unwinding.
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true
+
+[workspace.lints.rust]
+unsafe_code = "warn"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+# Mirror the ePHPm workspace's allow-list so a module that passes clippy here
+# passes it there too (and vice-versa when it is vendored back in).
+cast_possible_truncation = "allow"
+cast_precision_loss = "allow"
+doc_markdown = "allow"
+items_after_statements = "allow"
+manual_clamp = "allow"
+manual_let_else = "allow"
+needless_pass_by_value = "allow"
+ref_option = "allow"
+single_match_else = "allow"
+struct_excessive_bools = "allow"
+too_many_arguments = "allow"
+too_many_lines = "allow"
+unchecked_time_subtraction = "allow"
+ignore_without_reason = "allow"
+uninlined_format_args = "allow"
+unnecessary_cast = "allow"
+unused_async = "allow"
+unused_self = "allow"
+used_underscore_binding = "allow"

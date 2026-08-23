@@ -1,0 +1,23 @@
+[package]
+name = "ephpm-middleware-jwt"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "ePHPm native middleware: HS256 JWT bearer-token validation (loadable cdylib; implementation in ephpm-middleware-modules)"
+
+[lib]
+# cdylib = the loadable module for the dlopen lane; rlib so the module can be
+# unit/integration-tested and so ePHPm's `vendor-middleware` feature can link
+# the type. The C ABI exports (`declare!`) live in the cdylib and must never be
+# linked into the host binary alongside the other three shells — four modules
+# exporting the same `ephpm_middleware_*` symbols collide.
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+ephpm-middleware.workspace = true
+ephpm-middleware-modules.workspace = true
+
+[lints]
+workspace = true
