@@ -229,6 +229,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ephpm-middleware-maintenance-mode"
+version = "0.1.0"
+dependencies = [
+ "ephpm-middleware",
+ "ephpm-middleware-modules",
+ "serde_json",
+]
+
+[[package]]
 name = "ephpm-middleware-modules"
 version = "0.1.0"
 dependencies = [

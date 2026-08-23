@@ -90,7 +90,8 @@ jobs:
             {"short":"jwt",              "crate":"ephpm-middleware-jwt"},
             {"short":"cors",             "crate":"ephpm-middleware-cors"},
             {"short":"ratelimit",        "crate":"ephpm-middleware-ratelimit"},
-            {"short":"security-headers", "crate":"ephpm-middleware-security-headers"}
+            {"short":"security-headers", "crate":"ephpm-middleware-security-headers"},
+            {"short":"maintenance-mode", "crate":"ephpm-middleware-maintenance-mode"}
           ]'
 
           if [ "$ONLY_HOST" = "true" ]; then
