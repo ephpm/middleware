@@ -1,7 +1,7 @@
 # ePHPm middleware
 
 Prebuilt, versioned **native middleware modules** for
-[ePHPm](https://github.com/ephpm/ephpm) — the four official modules, shipped as
+[ePHPm](https://github.com/ephpm/ephpm) — the official modules, shipped as
 loadable shared libraries (`.so` / `.dylib` / `.dll`) you fetch and mount,
 rather than compile into the server.
 
@@ -20,6 +20,7 @@ for the operator view and chain semantics.
 
 | Module (short name) | Crate | What it does |
 |---------------------|-------|--------------|
+| `api-key` | `ephpm-middleware-api-key` | Validate an API key (header, optionally query param) against a static map or KV lookup; forward the resolved consumer id to PHP (constant-time compare; `401` otherwise). |
 | `jwt` | `ephpm-middleware-jwt` | Validate HS256 bearer tokens before PHP runs (constant-time HMAC; `alg` pinned; `exp` required). |
 | `cors` | `ephpm-middleware-cors` | Answer CORS preflights directly (`204`), append `Access-Control-*` to cross-origin responses. |
 | `ratelimit` | `ephpm-middleware-ratelimit` | Fixed-window per-client rate limiting over the embedded KV store (`429` + `Retry-After`). |
@@ -87,17 +88,18 @@ neither).
 
 ```
 crates/
-  ephpm-middleware-modules            rlib: the four impls as plain types, NO
+  ephpm-middleware-modules            rlib: the impls as plain types, NO
                                       C ABI exports (so they can all be linked
                                       into one binary — the cdylib shells, or
                                       ePHPm's `vendor-middleware` feature)
+  ephpm-middleware-api-key            cdylib shell: pub use + declare!(ApiKey)
   ephpm-middleware-jwt                cdylib shell: pub use + declare!(Jwt)
   ephpm-middleware-cors               cdylib shell
   ephpm-middleware-ratelimit          cdylib shell
   ephpm-middleware-security-headers   cdylib shell
 ```
 
-The impl/shell split is deliberate: four crates each exporting the same
+The impl/shell split is deliberate: multiple crates each exporting the same
 `ephpm_middleware_*` symbols cannot be linked into one binary, so the
 implementations live symbol-free in `ephpm-middleware-modules` and each cdylib
 adds only the `declare!` exports. That same rlib is what ePHPm's off-by-default
@@ -108,7 +110,7 @@ fully-static (non-`dlopen`) build.
 
 `.github/workflows/release.yml`:
 
-- **push a `v*` tag** → builds all four modules for the full platform matrix
+- **push a `v*` tag** → builds all modules for the full platform matrix
   (linux x86_64/aarch64 × gnu+musl, macOS aarch64, windows x86_64) and
   publishes the assets + `SHA256SUMS` + `manifest.json`.
 - **`workflow_dispatch`** → scriptable partial cut; `modules` and

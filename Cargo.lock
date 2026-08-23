@@ -213,6 +213,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "ephpm-middleware-api-key"
+version = "0.1.0"
+dependencies = [
+ "ephpm-middleware",
+ "ephpm-middleware-modules",
+]
+
+[[package]]
 name = "ephpm-middleware-cors"
 version = "0.1.0"
 dependencies = [
@@ -238,6 +246,7 @@ dependencies = [
  "hmac",
  "serde_json",
  "sha2",
+ "subtle",
 ]
 
 [[package]]

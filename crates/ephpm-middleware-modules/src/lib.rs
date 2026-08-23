@@ -1,4 +1,4 @@
-//! The four official ePHPm native middleware modules as plain Rust library
+//! The official ePHPm native middleware modules as plain Rust library
 //! code.
 //!
 //! Each module here is an ordinary [`ephpm_middleware::Middleware`]
@@ -16,6 +16,7 @@
 //! one binary — four copies of the same `ephpm_middleware_*` export symbols
 //! collide at link time — which is exactly why the implementations live here.
 
+pub mod api_key;
 pub mod cors;
 pub mod jwt;
 pub mod ratelimit;

@@ -21,6 +21,7 @@ serde_json.workspace = true
 hmac.workspace = true
 sha2.workspace = true
 base64ct.workspace = true
+subtle.workspace = true
 
 [dev-dependencies]
 # `host` gives the tests `RequestCtx` / `host_table` to fabricate a request,
