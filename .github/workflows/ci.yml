@@ -1,0 +1,77 @@
+name: ci
+
+# PR + push-to-main gate for the middleware modules. Until this existed the
+# only automation was release.yml (tags / dispatch), so modules could land with
+# no build/lint/test. This closes that hole: fmt, clippy, test, and a release
+# build all run on every pull request and every push to main.
+#
+# Runners are GitHub-HOSTED on purpose (same reasoning as release.yml): these
+# modules are pure Rust with no PHP SDK, so they don't need — and must not
+# contend with — the self-hosted ephemerd fleet that builds ePHPm itself and
+# the php-sdk tarballs.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Cancel superseded runs on the same ref (a new push to a PR aborts the old
+# in-flight run) so we don't burn hosted minutes on stale commits.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  # The ephpm-middleware ABI crate is a git dependency; fetch via the git CLI so
+  # host git rewrite rules apply — same as release.yml.
+  CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+
+permissions:
+  contents: read
+
+jobs:
+  # ── Formatting: rustfmt uses unstable options, so nightly is required ────────
+  fmt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install nightly + rustfmt
+        run: |
+          rustup toolchain install nightly --profile minimal --component rustfmt
+          rustup default nightly
+      - run: cargo +nightly fmt --all -- --check
+
+  # ── Lint: pedantic clippy, warnings are errors (must not be weakened) ────────
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install stable + clippy
+        run: |
+          rustup toolchain install stable --profile minimal --component clippy
+          rustup default stable
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+
+  # ── Tests: ~80 unit tests + the fail-open / deny integration binaries ────────
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install stable
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+      - run: cargo test --workspace
+
+  # ── Build: release-compile every cdylib to prove each module links. This is
+  #    what catches a broken module before a release tag would. ───────────────
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install stable
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+      - run: cargo build --workspace --release
