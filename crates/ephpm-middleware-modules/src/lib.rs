@@ -8,14 +8,12 @@
 //! (so `library = "jwt"` works even in a custom fully static build, where
 //! `dlopen` does not exist).
 //!
-//! The sibling
-//! `ephpm-middleware-{jwt,cors,ratelimit,security-headers,maintenance-mode}`
-//! crates are thin cdylib shells: they re-export these types and add the
-//! `declare!` C ABI glue, producing the loadable `.so`/`.dylib`/`.dll`
-//! artifacts for the dynamic (dlopen) lane. The shells cannot be merged into
-//! one binary — several copies of the same `ephpm_middleware_*` export
-//! symbols collide at link time — which is exactly why the implementations
-//! live here.
+//! `ephpm-middleware-<name>` crates are thin cdylib shells: they re-export
+//! these types and add the `declare!` C ABI glue, producing the loadable
+//! `.so`/`.dylib`/`.dll` artifacts for the dynamic (dlopen) lane. The shells
+//! cannot be merged into one binary — several copies of the same
+//! `ephpm_middleware_*` export symbols collide at link time — which is exactly
+//! why the implementations live here.
 
 pub mod api_key;
 pub mod cors;
@@ -23,4 +21,5 @@ pub mod ip_allowlist;
 pub mod jwt;
 pub mod maintenance_mode;
 pub mod ratelimit;
+pub mod redirect;
 pub mod security_headers;

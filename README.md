@@ -24,6 +24,7 @@ for the operator view and chain semantics.
 | `jwt` | `ephpm-middleware-jwt` | Validate HS256 bearer tokens before PHP runs (constant-time HMAC; `alg` pinned; `exp` required). |
 | `cors` | `ephpm-middleware-cors` | Answer CORS preflights directly (`204`), append `Access-Control-*` to cross-origin responses. |
 | `ratelimit` | `ephpm-middleware-ratelimit` | Fixed-window per-client rate limiting over the embedded KV store (`429` + `Retry-After`). |
+| `redirect` | `ephpm-middleware-redirect` | Enforce canonical URLs with a single `301`/`308` — `http`→`https`, apex↔`www` (or an explicit host map), trailing-slash add/strip. |
 | `security-headers` | `ephpm-middleware-security-headers` | Append standard security response headers (HSTS, CSP, `X-Frame-Options`, …). |
 | `maintenance-mode` | `ephpm-middleware-maintenance-mode` | Flip a tenant into a `503` holding page via a per-site KV flag — no redeploy (`Retry-After`; IP/path bypass; fails **open**). |
 | `ip-allowlist` | `ephpm-middleware-ip-allowlist` | Allow/deny requests by client IP against CIDR lists, fail-closed (`403`); deny beats allow. |
@@ -98,6 +99,7 @@ crates/
   ephpm-middleware-jwt                cdylib shell: pub use + declare!(Jwt)
   ephpm-middleware-cors               cdylib shell
   ephpm-middleware-ratelimit          cdylib shell
+  ephpm-middleware-redirect           cdylib shell
   ephpm-middleware-security-headers   cdylib shell
   ephpm-middleware-maintenance-mode   cdylib shell
   ephpm-middleware-ip-allowlist       cdylib shell
