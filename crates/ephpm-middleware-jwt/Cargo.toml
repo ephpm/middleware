@@ -11,7 +11,7 @@ description = "ePHPm native middleware: HS256 JWT bearer-token validation (loada
 # cdylib = the loadable module for the dlopen lane; rlib so the module can be
 # unit/integration-tested and so ePHPm's `vendor-middleware` feature can link
 # the type. The C ABI exports (`declare!`) live in the cdylib and must never be
-# linked into the host binary alongside the other three shells — four modules
+# linked into the host binary alongside the sibling shells — multiple modules
 # exporting the same `ephpm_middleware_*` symbols collide.
 crate-type = ["cdylib", "rlib"]
 

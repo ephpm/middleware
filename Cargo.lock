@@ -250,6 +250,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "ephpm-middleware-redirect"
+version = "0.1.0"
+dependencies = [
+ "ephpm-middleware",
+ "ephpm-middleware-modules",
+]
+
+[[package]]
 name = "ephpm-middleware-security-headers"
 version = "0.1.0"
 dependencies = [

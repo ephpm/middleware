@@ -9,7 +9,7 @@ name: release
 # ephemerd fleet that builds ePHPm itself and the php-sdk tarballs.
 #
 # Two triggers:
-#   * push of a `v*` tag  → full matrix, all four modules, a real release.
+#   * push of a `v*` tag  → full matrix, all modules, a real release.
 #   * workflow_dispatch   → scriptable proof/partial cut. `modules` and
 #     `only_host_platform` subset the work so a single module on one platform
 #     can validate the whole pipeline without grinding every leg.
@@ -90,6 +90,7 @@ jobs:
             {"short":"jwt",              "crate":"ephpm-middleware-jwt"},
             {"short":"cors",             "crate":"ephpm-middleware-cors"},
             {"short":"ratelimit",        "crate":"ephpm-middleware-ratelimit"},
+            {"short":"redirect",         "crate":"ephpm-middleware-redirect"},
             {"short":"security-headers", "crate":"ephpm-middleware-security-headers"}
           ]'
 

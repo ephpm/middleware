@@ -5,11 +5,11 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "The four official ePHPm native middleware implementations (jwt, cors, ratelimit, security-headers) as plain Rust types — shared by the loadable cdylib shells here and by ePHPm's optional compile-time `vendor-middleware` feature"
+description = "The official ePHPm native middleware implementations (jwt, cors, ratelimit, redirect, security-headers) as plain Rust types — shared by the loadable cdylib shells here and by ePHPm's optional compile-time `vendor-middleware` feature"
 
 # Deliberately rlib-only and free of C ABI exports. The sibling cdylib shells
-# (`ephpm-middleware-{jwt,cors,ratelimit,security-headers}`) re-export these
-# types and add `declare!`; four crates each exporting the same
+# (`ephpm-middleware-{jwt,cors,ratelimit,redirect,security-headers}`) re-export
+# these types and add `declare!`; multiple crates each exporting the same
 # `ephpm_middleware_*` symbols cannot be linked into one binary, which is
 # exactly why the implementations live here. This crate is also what ePHPm's
 # off-by-default `vendor-middleware` feature git-deps to compile the modules
