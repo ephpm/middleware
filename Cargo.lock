@@ -225,15 +225,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ephpm-middleware-ratelimit"
-version = "0.1.0"
-dependencies = [
- "ephpm-kv",
- "ephpm-middleware",
- "serde_json",
-]
-
-[[package]]
 name = "ephpm-middleware-redirect"
 version = "0.1.0"
 dependencies = [

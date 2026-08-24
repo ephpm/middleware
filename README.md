@@ -23,8 +23,8 @@ in two phases:
 - **Request phase** — runs **before** the request is served (on the PHP path and
   the static-file path), and can let the request `CONTINUE`, `REWRITE` it
   (inject/override request headers, rewrite the path), or `RESPOND` immediately
-  (short-circuit with a status + body — an auth `401`, a rate-limit `429`, a
-  redirect). It fails **closed**: a broken module aborts startup, and a panicking
+  (short-circuit with a status + body — an auth `401`, a redirect). It fails
+  **closed**: a broken module aborts startup, and a panicking
   `invoke` returns `500` rather than letting the request through.
 - **Response phase** — optional; runs **after** the response is generated
   (PHP, static file, or error page), in **reverse** chain order, to *transform*
@@ -40,13 +40,12 @@ for chain semantics, `match`/`order`, and mounting.
 
 ## The examples
 
-Four modules, chosen to cover the range rather than every use case:
+Three modules, chosen to cover the range rather than every use case:
 
 | Example | Crate | Teaches |
 |---------|-------|---------|
-| `api-key` | `ephpm-middleware-api-key` | A **request-phase auth gate**: read a key from a header (or query param), validate it against a static map **or** a KV lookup with a constant-time compare, and forward the resolved consumer id to PHP — or short-circuit `401`. |
+| `api-key` | `ephpm-middleware-api-key` | A **request-phase auth gate** that also **uses the KV store**: read a key from a header (or query param), validate it against a static map **or** a `kv_get` lookup with a constant-time compare, and forward the resolved consumer id to PHP — or short-circuit `401`. |
 | `redirect` | `ephpm-middleware-redirect` | The **simplest early-return**: compute a canonical URL (scheme / host / trailing slash) and emit a single `301`/`308`, or `CONTINUE`. No KV, no extra deps. |
-| `ratelimit` | `ephpm-middleware-ratelimit` | **Using the KV store**: a fixed-window per-client counter via one atomic `kv_incr_ttl`, `429 + Retry-After` over the limit, **fail-open** when KV is down. Includes a fail-open integration test. |
 | `header-transform` | `ephpm-middleware-header-transform` | The **response phase**: `declare!(Type, response)`, setting request headers PHP sees *and* setting/removing response headers on the way out. |
 
 Each crate's `src/lib.rs` is self-contained — implementation, module docs, unit
@@ -96,8 +95,7 @@ impl ResponseMiddleware for MyGate {
 
 **KV access.** The request carries a handle to ePHPm's embedded KV store —
 `req.host().kv_get(key)`, `kv_set`, `kv_incr_ttl(key, by, ttl)` — the same
-gossip-replicated store PHP uses. See `api-key` (read) and `ratelimit` (atomic
-increment) for real usage.
+gossip-replicated store PHP uses. See `api-key` for a real `kv_get` lookup.
 
 ### The ABI is versioned
 
@@ -120,10 +118,10 @@ CARGO_NET_GIT_FETCH_WITH_CLI=true cargo build --release -p ephpm-middleware-redi
 #   ephpm_middleware_redirect.dll — no `lib` prefix — on Windows)
 ```
 
-`cargo test --workspace` runs every example's unit tests plus the ratelimit
-fail-open integration test. The `host` feature of `ephpm-middleware` and the
-embedded KV store are pulled in only as **dev-dependencies** (to fabricate a
-request and a real KV store in tests); the shipped cdylib needs neither.
+`cargo test --workspace` runs every example's unit tests. The `host` feature of
+`ephpm-middleware` and the embedded KV store are pulled in only as
+**dev-dependencies** (to fabricate a request and a real KV store in tests); the
+shipped cdylib needs neither.
 
 ## Mounting a custom module
 
@@ -169,10 +167,9 @@ instead.
 
 ```
 crates/
-  ephpm-middleware-api-key            request-phase auth gate  (declare!(ApiKey))
-  ephpm-middleware-redirect           canonical-URL redirect   (declare!(Redirect))
-  ephpm-middleware-ratelimit          KV-backed rate limiter   (declare!(RateLimit))
-  ephpm-middleware-header-transform   response phase           (declare!(HeaderTransform, response))
+  ephpm-middleware-api-key            request-phase auth gate + KV  (declare!(ApiKey))
+  ephpm-middleware-redirect           canonical-URL redirect        (declare!(Redirect))
+  ephpm-middleware-header-transform   response phase                (declare!(HeaderTransform, response))
 ```
 
 ## CI
