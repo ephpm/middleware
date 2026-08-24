@@ -16,10 +16,13 @@
 //! why the implementations live here.
 
 pub mod api_key;
+pub mod compression;
 pub mod cors;
+pub mod header_transform;
 pub mod ip_allowlist;
 pub mod jwt;
 pub mod maintenance_mode;
 pub mod ratelimit;
 pub mod redirect;
+pub mod request_id;
 pub mod security_headers;

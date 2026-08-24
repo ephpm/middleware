@@ -1,0 +1,21 @@
+[package]
+name = "ephpm-middleware-header-transform"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "ePHPm native middleware: set request headers seen by PHP and set/remove response headers out (request + response phase; loadable cdylib; implementation in ephpm-middleware-modules)"
+
+[lib]
+# cdylib = the loadable module for the dlopen lane; rlib for tests + the
+# `vendor-middleware` feature. See ephpm-middleware-jwt for the symbol-collision
+# rationale behind the impl/shell split.
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+ephpm-middleware.workspace = true
+ephpm-middleware-modules.workspace = true
+
+[lints]
+workspace = true

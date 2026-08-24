@@ -19,14 +19,20 @@ repository = "https://github.com/ephpm/middleware"
 # by `rev` exactly like ePHPm pins litewire: a drift in `EphpmHostV1` / `ABI_V1`
 # would be silent UB at the FFI boundary, so the module is provably built
 # against one specific host-ABI commit. Bump = replace `rev` + `cargo update`.
+#
+# Pinned at ePHPm main `e63284838d07d348e2155e76916daaf9782c012b` — the merge of
+# #408, which added the response-phase ABI hook (`ResponseMiddleware` /
+# `declare!(Type, response)` / the `ResponseView` accessors) the request-id,
+# header-transform and compression modules build on. Do NOT advance this to
+# #409's scheme/host/body accessors: none of these three modules need them.
 # The rlib of shared module implementations — re-exported by the cdylib shells.
 ephpm-middleware-modules = { path = "crates/ephpm-middleware-modules" }
-ephpm-middleware = { git = "https://github.com/ephpm/ephpm.git", rev = "a6e5317718dfa11ed2b7f6970996139b305eed73" }
+ephpm-middleware = { git = "https://github.com/ephpm/ephpm.git", rev = "e63284838d07d348e2155e76916daaf9782c012b" }
 # Test-only: the same embedded KV store the host wires into the middleware host
 # table, so the ratelimit unit tests exercise the real `kv_incr_ttl` path. Same
 # rev as the ABI crate so both resolve to one crate instance and the `Store`
 # type matches `ephpm_middleware::host::set_kv_store`.
-ephpm-kv = { git = "https://github.com/ephpm/ephpm.git", rev = "a6e5317718dfa11ed2b7f6970996139b305eed73" }
+ephpm-kv = { git = "https://github.com/ephpm/ephpm.git", rev = "e63284838d07d348e2155e76916daaf9782c012b" }
 
 serde_json = "1"
 # ip-allowlist: CIDR parsing + membership for IPv4/IPv6. Default features only
@@ -39,6 +45,12 @@ base64ct = { version = "1", features = ["alloc"] }
 # api-key: constant-time key comparison to close the timing oracle a naive `==`
 # would open. Tiny, no_std, no transitive deps.
 subtle = "2"
+# compression: gzip + brotli for the response-phase body transform. Same crates
+# and majors ePHPm's own buffered-compression path uses (`flate2 = "1"`,
+# `brotli = "7"` in the ePHPm workspace), so a module vendored back in resolves
+# to one shared instance.
+flate2 = "1"
+brotli = "7"
 
 # Release-profile tuning. `panic = "abort"` is DELIBERATELY NOT set: the
 # `declare!` glue in `ephpm-middleware` uses `catch_unwind` to fail CLOSED on a

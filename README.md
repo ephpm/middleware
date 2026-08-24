@@ -10,9 +10,14 @@ rather than compile into the server.
 > the repo is private those downloads require a token. The owner flips it
 > public when ready.
 
-ePHPm runs middleware **in front of PHP, before PHP dispatch** — reject,
-rewrite, or annotate a request at native speed, with direct access to the
-embedded (cluster-replicated) KV store. See the
+ePHPm runs middleware in two phases. The **request phase** runs **in front of
+PHP, before PHP dispatch** — reject, rewrite, or annotate a request at native
+speed, with direct access to the embedded (cluster-replicated) KV store; it
+fails **closed**. The optional **response phase** runs **after** the response
+is generated (PHP, static file, or error page), in reverse chain order, to
+*transform* it — compression, header injection, correlation ids; it fails
+**safe** and is not a security gate. A module opts into the response phase with
+`declare!(Type, response)`. See the
 [Native Middleware guide](https://github.com/ephpm/ephpm/blob/main/site/content/guides/native-middleware.md)
 for the operator view and chain semantics.
 
@@ -28,6 +33,17 @@ for the operator view and chain semantics.
 | `security-headers` | `ephpm-middleware-security-headers` | Append standard security response headers (HSTS, CSP, `X-Frame-Options`, …). |
 | `maintenance-mode` | `ephpm-middleware-maintenance-mode` | Flip a tenant into a `503` holding page via a per-site KV flag — no redeploy (`Retry-After`; IP/path bypass; fails **open**). |
 | `ip-allowlist` | `ephpm-middleware-ip-allowlist` | Allow/deny requests by client IP against CIDR lists, fail-closed (`403`); deny beats allow. |
+| `request-id` | `ephpm-middleware-request-id` | **Request + response phase.** Give every request a correlation id: generate or honor an inbound `X-Request-Id`, inject it for PHP, and echo it on the response. |
+| `header-transform` | `ephpm-middleware-header-transform` | **Request + response phase.** Set request headers seen by PHP; set/remove response headers out. |
+| `compression` | `ephpm-middleware-compression` | **Response phase.** gzip/brotli the buffered body with `Accept-Encoding` negotiation. Skips already-encoded responses, so it never double-encodes — see the note below. |
+
+> **`compression` overlaps ePHPm's built-in compressor.** ePHPm already
+> compresses buffered responses by default (`[server.response] compression`,
+> **on**, brotli-then-gzip, before the response phase). The `compression`
+> module stands down whenever a `Content-Encoding` is already present, so on a
+> stock server it is **inert** — mount it only when core compression is turned
+> **off** (`compression = false`) but you still want per-mount compression. It
+> will not double-encode. See the crate's module docs.
 
 Per-module configuration keys are documented in each crate's module docs
 (`crates/ephpm-middleware-<name>/src/lib.rs` re-exports the implementation from
@@ -103,7 +119,15 @@ crates/
   ephpm-middleware-security-headers   cdylib shell
   ephpm-middleware-maintenance-mode   cdylib shell
   ephpm-middleware-ip-allowlist       cdylib shell
+  ephpm-middleware-request-id         cdylib shell: declare!(RequestId, response)
+  ephpm-middleware-header-transform   cdylib shell: declare!(HeaderTransform, response)
+  ephpm-middleware-compression        cdylib shell: declare!(Compress, response)
 ```
+
+The last three opt into the **response phase** with `declare!(Type, response)`
+— the host runs their `invoke_response` after the response is generated to
+transform it, in addition to (or, for `compression`, instead of) a request
+phase.
 
 The impl/shell split is deliberate: multiple crates each exporting the same
 `ephpm_middleware_*` symbols cannot be linked into one binary, so the
