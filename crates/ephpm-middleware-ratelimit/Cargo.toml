@@ -5,23 +5,23 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "ePHPm native middleware: fixed-window per-client rate limiting over the embedded KV store (loadable cdylib; implementation in ephpm-middleware-modules)"
+description = "Example ePHPm native middleware: fixed-window per-client rate limiting over the embedded KV store"
 
 [lib]
-# cdylib = the loadable module for the dlopen lane; rlib for tests + the
-# `vendor-middleware` feature. See ephpm-middleware-jwt for the symbol-collision
-# rationale behind the impl/shell split.
+# cdylib = the loadable module ePHPm dlopen()s; rlib so the unit tests and the
+# fail-open integration test can link the crate as a library.
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 ephpm-middleware.workspace = true
-ephpm-middleware-modules.workspace = true
+serde_json.workspace = true
 
 [dev-dependencies]
-# The fail-open integration test needs its own process (the host KV store is
-# process-global and can only be set once) and drives `RateLimit` directly.
+# `host` gives the tests RequestCtx / host_table and the real embedded KV
+# store. The fail-open integration test (tests/fail_open.rs) runs in its own
+# process because the host KV store is process-global and set-once. Dev-only.
 ephpm-middleware = { workspace = true, features = ["host"] }
-serde_json.workspace = true
+ephpm-kv.workspace = true
 
 [lints]
 workspace = true

@@ -39,12 +39,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "base64ct"
-version = "1.8.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2af50177e190e07a26ab74f8b1efbfe2ef87da2116221318cb1c2e82baf7de06"
-
-[[package]]
 name = "bitflags"
 version = "2.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -216,16 +210,10 @@ dependencies = [
 name = "ephpm-middleware-api-key"
 version = "0.1.0"
 dependencies = [
+ "ephpm-kv",
  "ephpm-middleware",
- "ephpm-middleware-modules",
-]
-
-[[package]]
-name = "ephpm-middleware-cors"
-version = "0.1.0"
-dependencies = [
- "ephpm-middleware",
- "ephpm-middleware-modules",
+ "serde_json",
+ "subtle",
 ]
 
 [[package]]
@@ -233,55 +221,15 @@ name = "ephpm-middleware-header-transform"
 version = "0.1.0"
 dependencies = [
  "ephpm-middleware",
- "ephpm-middleware-modules",
-]
-
-[[package]]
-name = "ephpm-middleware-ip-allowlist"
-version = "0.1.0"
-dependencies = [
- "ephpm-middleware",
- "ephpm-middleware-modules",
  "serde_json",
-]
-
-[[package]]
-name = "ephpm-middleware-jwt"
-version = "0.1.0"
-dependencies = [
- "ephpm-middleware",
- "ephpm-middleware-modules",
-]
-
-[[package]]
-name = "ephpm-middleware-maintenance-mode"
-version = "0.1.0"
-dependencies = [
- "ephpm-middleware",
- "ephpm-middleware-modules",
- "serde_json",
-]
-
-[[package]]
-name = "ephpm-middleware-modules"
-version = "0.1.0"
-dependencies = [
- "base64ct",
- "ephpm-kv",
- "ephpm-middleware",
- "hmac",
- "ipnetwork",
- "serde_json",
- "sha2",
- "subtle",
 ]
 
 [[package]]
 name = "ephpm-middleware-ratelimit"
 version = "0.1.0"
 dependencies = [
+ "ephpm-kv",
  "ephpm-middleware",
- "ephpm-middleware-modules",
  "serde_json",
 ]
 
@@ -290,23 +238,7 @@ name = "ephpm-middleware-redirect"
 version = "0.1.0"
 dependencies = [
  "ephpm-middleware",
- "ephpm-middleware-modules",
-]
-
-[[package]]
-name = "ephpm-middleware-request-id"
-version = "0.1.0"
-dependencies = [
- "ephpm-middleware",
- "ephpm-middleware-modules",
-]
-
-[[package]]
-name = "ephpm-middleware-security-headers"
-version = "0.1.0"
-dependencies = [
- "ephpm-middleware",
- "ephpm-middleware-modules",
+ "serde_json",
 ]
 
 [[package]]
@@ -460,12 +392,6 @@ name = "inlinable_string"
 version = "0.1.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c8fae54786f62fb2918dcfae3d568594e50eb9b5c25bf04371af6fe7516452fb"
-
-[[package]]
-name = "ipnetwork"
-version = "0.21.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cf370abdafd54d13e54a620e8c3e1145f28e46cc9d704bc6d94414559df41763"
 
 [[package]]
 name = "itoa"

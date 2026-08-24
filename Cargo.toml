@@ -5,43 +5,35 @@ resolver = "3"
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
-# 1.88 matches the ePHPm workspace and the `ephpm-middleware` ABI crate this
-# repo depends on by git rev; cargo refuses to compile a dependency whose
+# 1.88 matches the ePHPm workspace and the `ephpm-middleware` ABI crate these
+# examples depend on by git rev; cargo refuses to compile a dependency whose
 # declared rust-version exceeds the active toolchain.
 rust-version = "1.88"
 license = "MIT"
-repository = "https://github.com/ephpm/middleware"
+repository = "https://github.com/ephpm/middleware-examples"
 
 [workspace.dependencies]
 # The ePHPm native-middleware ABI + authoring kit. It lives in the ePHPm repo
 # (`crates/ephpm-middleware`) and is the shared contract between the host and
-# every module — the host side needs it too, so it is NOT vendored here. Pinned
-# by `rev` exactly like ePHPm pins litewire: a drift in `EphpmHostV1` / `ABI_V1`
-# would be silent UB at the FFI boundary, so the module is provably built
-# against one specific host-ABI commit. Bump = replace `rev` + `cargo update`.
+# every module. It is pinned by `rev` exactly the way ePHPm pins litewire: a
+# drift in `EphpmHostV1` / `ABI_V1` would be silent UB at the FFI boundary, so
+# each example is provably built against one specific host-ABI commit. To
+# rebuild these examples against a newer host, replace `rev` and run
+# `cargo update`.
 #
 # Pinned at ePHPm main `e63284838d07d348e2155e76916daaf9782c012b` — the merge of
 # #408, which added the response-phase ABI hook (`ResponseMiddleware` /
-# `declare!(Type, response)` / the `ResponseView` accessors) the request-id and
-# header-transform modules build on. Do NOT advance this to #409's
-# scheme/host/body accessors: neither module needs them.
-# The rlib of shared module implementations — re-exported by the cdylib shells.
-ephpm-middleware-modules = { path = "crates/ephpm-middleware-modules" }
+# `declare!(Type, response)` / the `ResponseView` accessors) the
+# header-transform example builds on.
 ephpm-middleware = { git = "https://github.com/ephpm/ephpm.git", rev = "e63284838d07d348e2155e76916daaf9782c012b" }
 # Test-only: the same embedded KV store the host wires into the middleware host
-# table, so the ratelimit unit tests exercise the real `kv_incr_ttl` path. Same
-# rev as the ABI crate so both resolve to one crate instance and the `Store`
-# type matches `ephpm_middleware::host::set_kv_store`.
+# table, so the api-key and ratelimit examples exercise the real KV path in
+# their unit tests. Same rev as the ABI crate so both resolve to one crate
+# instance and the `Store` type matches `ephpm_middleware::host::set_kv_store`.
 ephpm-kv = { git = "https://github.com/ephpm/ephpm.git", rev = "e63284838d07d348e2155e76916daaf9782c012b" }
 
+# Every example parses its config out of a `serde_json::Value`.
 serde_json = "1"
-# ip-allowlist: CIDR parsing + membership for IPv4/IPv6. Default features only
-# (`serde` is an opt-in feature we do not enable), so no extra transitive deps.
-ipnetwork = "0.21"
-# jwt: HS256 via hmac/sha2 — no heavyweight JWT dependency.
-hmac = "0.12"
-sha2 = "0.10"
-base64ct = { version = "1", features = ["alloc"] }
 # api-key: constant-time key comparison to close the timing oracle a naive `==`
 # would open. Tiny, no_std, no transitive deps.
 subtle = "2"
@@ -63,7 +55,7 @@ unsafe_code = "warn"
 all = { level = "warn", priority = -1 }
 pedantic = { level = "warn", priority = -1 }
 # Mirror the ePHPm workspace's allow-list so a module that passes clippy here
-# passes it there too (and vice-versa when it is vendored back in).
+# passes it there too.
 cast_possible_truncation = "allow"
 cast_precision_loss = "allow"
 doc_markdown = "allow"

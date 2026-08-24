@@ -5,17 +5,20 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "ePHPm native middleware: canonical-host / scheme / trailing-slash 301-308 redirects (loadable cdylib; implementation in ephpm-middleware-modules)"
+description = "Example ePHPm native middleware: canonical-host / scheme / trailing-slash 301-308 redirects"
 
 [lib]
-# cdylib = the loadable module for the dlopen lane; rlib for tests + the
-# `vendor-middleware` feature. See ephpm-middleware-jwt for the symbol-collision
-# rationale behind the impl/shell split.
+# cdylib = the loadable module ePHPm dlopen()s; rlib so the unit tests can link
+# the crate as a library.
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 ephpm-middleware.workspace = true
-ephpm-middleware-modules.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+# `host` gives the tests RequestCtx / host_table to fabricate a request.
+ephpm-middleware = { workspace = true, features = ["host"] }
 
 [lints]
 workspace = true
