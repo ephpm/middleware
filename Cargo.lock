@@ -221,14 +221,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ephpm-middleware-compression"
-version = "0.1.0"
-dependencies = [
- "ephpm-middleware",
- "ephpm-middleware-modules",
-]
-
-[[package]]
 name = "ephpm-middleware-cors"
 version = "0.1.0"
 dependencies = [
@@ -275,10 +267,8 @@ name = "ephpm-middleware-modules"
 version = "0.1.0"
 dependencies = [
  "base64ct",
- "brotli",
  "ephpm-kv",
  "ephpm-middleware",
- "flate2",
  "hmac",
  "ipnetwork",
  "serde_json",

@@ -96,8 +96,7 @@ jobs:
             {"short":"maintenance-mode", "crate":"ephpm-middleware-maintenance-mode"},
             {"short":"ip-allowlist",     "crate":"ephpm-middleware-ip-allowlist"},
             {"short":"request-id",       "crate":"ephpm-middleware-request-id"},
-            {"short":"header-transform", "crate":"ephpm-middleware-header-transform"},
-            {"short":"compression",      "crate":"ephpm-middleware-compression"}
+            {"short":"header-transform", "crate":"ephpm-middleware-header-transform"}
           ]'
 
           if [ "$ONLY_HOST" = "true" ]; then

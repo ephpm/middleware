@@ -16,7 +16,6 @@
 //! why the implementations live here.
 
 pub mod api_key;
-pub mod compression;
 pub mod cors;
 pub mod header_transform;
 pub mod ip_allowlist;

@@ -27,9 +27,6 @@ base64ct.workspace = true
 ipnetwork.workspace = true
 # api-key: constant-time key comparison (no_std, no transitive deps).
 subtle.workspace = true
-# compression: gzip (flate2) + brotli for the response-phase body transform.
-flate2.workspace = true
-brotli.workspace = true
 
 [dev-dependencies]
 # `host` gives the tests `RequestCtx` / `host_table` to fabricate a request,
