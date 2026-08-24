@@ -172,7 +172,7 @@ dependencies = [
 [[package]]
 name = "ephpm-config"
 version = "0.1.0"
-source = "git+https://github.com/ephpm/ephpm.git?rev=a6e5317718dfa11ed2b7f6970996139b305eed73#a6e5317718dfa11ed2b7f6970996139b305eed73"
+source = "git+https://github.com/ephpm/ephpm.git?rev=e63284838d07d348e2155e76916daaf9782c012b#e63284838d07d348e2155e76916daaf9782c012b"
 dependencies = [
  "figment",
  "serde",
@@ -184,7 +184,7 @@ dependencies = [
 [[package]]
 name = "ephpm-kv"
 version = "0.1.0"
-source = "git+https://github.com/ephpm/ephpm.git?rev=a6e5317718dfa11ed2b7f6970996139b305eed73#a6e5317718dfa11ed2b7f6970996139b305eed73"
+source = "git+https://github.com/ephpm/ephpm.git?rev=e63284838d07d348e2155e76916daaf9782c012b#e63284838d07d348e2155e76916daaf9782c012b"
 dependencies = [
  "anyhow",
  "brotli",
@@ -205,7 +205,7 @@ dependencies = [
 [[package]]
 name = "ephpm-middleware"
 version = "0.1.0"
-source = "git+https://github.com/ephpm/ephpm.git?rev=a6e5317718dfa11ed2b7f6970996139b305eed73#a6e5317718dfa11ed2b7f6970996139b305eed73"
+source = "git+https://github.com/ephpm/ephpm.git?rev=e63284838d07d348e2155e76916daaf9782c012b#e63284838d07d348e2155e76916daaf9782c012b"
 dependencies = [
  "ephpm-kv",
  "serde_json",
@@ -222,6 +222,14 @@ dependencies = [
 
 [[package]]
 name = "ephpm-middleware-cors"
+version = "0.1.0"
+dependencies = [
+ "ephpm-middleware",
+ "ephpm-middleware-modules",
+]
+
+[[package]]
+name = "ephpm-middleware-header-transform"
 version = "0.1.0"
 dependencies = [
  "ephpm-middleware",
@@ -279,6 +287,14 @@ dependencies = [
 
 [[package]]
 name = "ephpm-middleware-redirect"
+version = "0.1.0"
+dependencies = [
+ "ephpm-middleware",
+ "ephpm-middleware-modules",
+]
+
+[[package]]
+name = "ephpm-middleware-request-id"
 version = "0.1.0"
 dependencies = [
  "ephpm-middleware",

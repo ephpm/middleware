@@ -94,7 +94,9 @@ jobs:
             {"short":"redirect",         "crate":"ephpm-middleware-redirect"},
             {"short":"security-headers", "crate":"ephpm-middleware-security-headers"},
             {"short":"maintenance-mode", "crate":"ephpm-middleware-maintenance-mode"},
-            {"short":"ip-allowlist",     "crate":"ephpm-middleware-ip-allowlist"}
+            {"short":"ip-allowlist",     "crate":"ephpm-middleware-ip-allowlist"},
+            {"short":"request-id",       "crate":"ephpm-middleware-request-id"},
+            {"short":"header-transform", "crate":"ephpm-middleware-header-transform"}
           ]'
 
           if [ "$ONLY_HOST" = "true" ]; then
