@@ -1,0 +1,30 @@
+[package]
+name = "ephpm-middleware-basic-auth"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Example ePHPm native middleware: HTTP Basic auth gate (RFC 7617) — the simplest whole-site auth gate, gating static assets and PHP alike"
+
+[lib]
+# cdylib = the loadable module ePHPm dlopen()s; rlib so the unit tests can link
+# the crate as a library.
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+ephpm-middleware.workspace = true
+serde_json.workspace = true
+# Constant-time credential comparison — closes the timing oracle a naive `==`
+# opens (and avoids leaking which usernames exist).
+subtle.workspace = true
+# Decode the base64 `Authorization: Basic` credential.
+base64ct.workspace = true
+
+[dev-dependencies]
+# `host` gives the tests RequestCtx / host_table to fabricate a request without
+# a running server. Dev-only: resolver 3 keeps it out of the shipped cdylib.
+ephpm-middleware = { workspace = true, features = ["host"] }
+
+[lints]
+workspace = true

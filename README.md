@@ -40,10 +40,11 @@ for chain semantics, `match`/`order`, and mounting.
 
 ## The examples
 
-Three modules, chosen to cover the range rather than every use case:
+Four modules, chosen to cover the range rather than every use case:
 
 | Example | Crate | Teaches |
 |---------|-------|---------|
+| `basic-auth` | `ephpm-middleware-basic-auth` | The **simplest whole-site auth gate**: verify an `Authorization: Basic` credential (RFC 7617) with a constant-time compare, `401` + `WWW-Authenticate` otherwise. No KV. Gates static assets and PHP alike (ePHPm #408/#395). Start here. |
 | `api-key` | `ephpm-middleware-api-key` | A **request-phase auth gate** that also **uses the KV store**: read a key from a header (or query param), validate it against a static map **or** a `kv_get` lookup with a constant-time compare, and forward the resolved consumer id to PHP — or short-circuit `401`. |
 | `redirect` | `ephpm-middleware-redirect` | The **simplest early-return**: compute a canonical URL (scheme / host / trailing slash) and emit a single `301`/`308`, or `CONTINUE`. No KV, no extra deps. |
 | `header-transform` | `ephpm-middleware-header-transform` | The **response phase**: `declare!(Type, response)`, setting request headers PHP sees *and* setting/removing response headers on the way out. |
@@ -167,6 +168,7 @@ instead.
 
 ```
 crates/
+  ephpm-middleware-basic-auth         HTTP Basic whole-site gate    (declare!(BasicAuth))
   ephpm-middleware-api-key            request-phase auth gate + KV  (declare!(ApiKey))
   ephpm-middleware-redirect           canonical-URL redirect        (declare!(Redirect))
   ephpm-middleware-header-transform   response phase                (declare!(HeaderTransform, response))
