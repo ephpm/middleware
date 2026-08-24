@@ -5,17 +5,25 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "ePHPm native middleware: API-key authentication forwarding the resolved consumer identity to PHP (loadable cdylib; implementation in ephpm-middleware-modules)"
+description = "Example ePHPm native middleware: API-key auth gate that forwards the resolved consumer identity to PHP"
 
 [lib]
-# cdylib = the loadable module for the dlopen lane; rlib for tests + the
-# `vendor-middleware` feature. See ephpm-middleware-jwt for the symbol-collision
-# rationale behind the impl/shell split.
+# cdylib = the loadable module ePHPm dlopen()s; rlib so the unit tests can link
+# the crate as a library.
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 ephpm-middleware.workspace = true
-ephpm-middleware-modules.workspace = true
+serde_json.workspace = true
+# Constant-time key comparison — closes the timing oracle a naive `==` opens.
+subtle.workspace = true
+
+[dev-dependencies]
+# `host` gives the tests RequestCtx / host_table to fabricate a request; the
+# real embedded KV store backs the kv-lookup tests. Dev-only: resolver 3 keeps
+# both out of the shipped cdylib, which needs neither.
+ephpm-middleware = { workspace = true, features = ["host"] }
+ephpm-kv.workspace = true
 
 [lints]
 workspace = true

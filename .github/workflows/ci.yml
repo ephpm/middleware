@@ -1,14 +1,12 @@
 name: ci
 
-# PR + push-to-main gate for the middleware modules. Until this existed the
-# only automation was release.yml (tags / dispatch), so modules could land with
-# no build/lint/test. This closes that hole: fmt, clippy, test, and a release
-# build all run on every pull request and every push to main.
+# PR + push-to-main gate for the example middleware modules — so these teaching
+# examples never rot. fmt, clippy, test, and a release build all run on every
+# pull request and every push to main.
 #
-# Runners are GitHub-HOSTED on purpose (same reasoning as release.yml): these
-# modules are pure Rust with no PHP SDK, so they don't need — and must not
-# contend with — the self-hosted ephemerd fleet that builds ePHPm itself and
-# the php-sdk tarballs.
+# Runners are GitHub-HOSTED on purpose: these modules are pure Rust with no PHP
+# SDK, so they don't need — and must not contend with — the self-hosted
+# ephemerd fleet that builds ePHPm itself and the php-sdk tarballs.
 
 on:
   pull_request:
@@ -24,7 +22,7 @@ concurrency:
 env:
   CARGO_TERM_COLOR: always
   # The ephpm-middleware ABI crate is a git dependency; fetch via the git CLI so
-  # host git rewrite rules apply — same as release.yml.
+  # host git rewrite rules apply.
   CARGO_NET_GIT_FETCH_WITH_CLI: "true"
 
 permissions:
@@ -53,7 +51,7 @@ jobs:
           rustup default stable
       - run: cargo clippy --workspace --all-targets -- -D warnings
 
-  # ── Tests: ~80 unit tests + the fail-open / deny integration binaries ────────
+  # ── Tests: the per-example unit tests + the ratelimit fail-open integration ──
   test:
     runs-on: ubuntu-latest
     steps:
@@ -64,8 +62,7 @@ jobs:
           rustup default stable
       - run: cargo test --workspace
 
-  # ── Build: release-compile every cdylib to prove each module links. This is
-  #    what catches a broken module before a release tag would. ───────────────
+  # ── Build: release-compile every cdylib to prove each example still links ────
   build:
     runs-on: ubuntu-latest
     steps:

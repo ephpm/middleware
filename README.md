@@ -1,150 +1,182 @@
-# ePHPm middleware
+# ePHPm middleware examples
 
-Prebuilt, versioned **native middleware modules** for
-[ePHPm](https://github.com/ephpm/ephpm) — the official modules, shipped as
-loadable shared libraries (`.so` / `.dylib` / `.dll`) you fetch and mount,
-rather than compile into the server.
+Reference implementations of **native middleware** for
+[ePHPm](https://github.com/ephpm/ephpm) — small, well-commented Rust modules
+you can read, copy, and adapt to write your own.
 
-> **This repo must be public to serve unauthenticated release downloads.** The
-> `ephpm middleware` CLI downloads release assets over anonymous HTTPS; while
-> the repo is private those downloads require a token. The owner flips it
-> public when ready.
+> **The official modules are compiled into ePHPm itself.** `jwt`, `cors`,
+> `ratelimit`, `security-headers`, `api-key`, `ip-allowlist`, `maintenance-mode`,
+> `redirect`, `request-id`, and `header-transform` ship inside every ePHPm
+> binary and are mounted by name (`library = "jwt"`) with nothing to download.
+> This repo is **not** a distribution channel for them. It is teaching material:
+> the four crates here are stand-alone templates that show the whole shape of a
+> module — the ABI, the `declare!` macro, the request and response phases, and
+> KV access — so you can build a *custom* one.
 
-ePHPm runs middleware in two phases. The **request phase** runs **in front of
-PHP, before PHP dispatch** — reject, rewrite, or annotate a request at native
-speed, with direct access to the embedded (cluster-replicated) KV store; it
-fails **closed**. The optional **response phase** runs **after** the response
-is generated (PHP, static file, or error page), in reverse chain order, to
-*transform* it — header injection, correlation ids; it fails
-**safe** and is not a security gate. A module opts into the response phase with
-`declare!(Type, response)`. See the
+## What native middleware is
+
+A native middleware module is a tiny shared library (`.so` / `.dylib` / `.dll`)
+that ePHPm loads at startup and runs **in front of / around PHP**, at native
+speed, with direct access to the embedded (cluster-replicated) KV store. It runs
+in two phases:
+
+- **Request phase** — runs **before** the request is served (on the PHP path and
+  the static-file path), and can let the request `CONTINUE`, `REWRITE` it
+  (inject/override request headers, rewrite the path), or `RESPOND` immediately
+  (short-circuit with a status + body — an auth `401`, a redirect). It fails
+  **closed**: a broken module aborts startup, and a panicking
+  `invoke` returns `500` rather than letting the request through.
+- **Response phase** — optional; runs **after** the response is generated
+  (PHP, static file, or error page), in **reverse** chain order, to *transform*
+  it: set/remove response headers, adjust status. It fails **safe** (a broken
+  transform leaves the response unchanged) and is **not** a security gate. A
+  module opts in with `declare!(Type, response)` (added to the ABI in ePHPm
+  [#408](https://github.com/ephpm/ephpm/pull/408)); the response phase only runs
+  on **buffered** bodies (streamed responses bypass it).
+
+See the operator-facing
 [Native Middleware guide](https://github.com/ephpm/ephpm/blob/main/site/content/guides/native-middleware.md)
-for the operator view and chain semantics.
+for chain semantics, `match`/`order`, and mounting.
 
-## The modules
+## The examples
 
-| Module (short name) | Crate | What it does |
-|---------------------|-------|--------------|
-| `api-key` | `ephpm-middleware-api-key` | Validate an API key (header, optionally query param) against a static map or KV lookup; forward the resolved consumer id to PHP (constant-time compare; `401` otherwise). |
-| `jwt` | `ephpm-middleware-jwt` | Validate HS256 bearer tokens before PHP runs (constant-time HMAC; `alg` pinned; `exp` required). |
-| `cors` | `ephpm-middleware-cors` | Answer CORS preflights directly (`204`), append `Access-Control-*` to cross-origin responses. |
-| `ratelimit` | `ephpm-middleware-ratelimit` | Fixed-window per-client rate limiting over the embedded KV store (`429` + `Retry-After`). |
-| `redirect` | `ephpm-middleware-redirect` | Enforce canonical URLs with a single `301`/`308` — `http`→`https`, apex↔`www` (or an explicit host map), trailing-slash add/strip. |
-| `security-headers` | `ephpm-middleware-security-headers` | Append standard security response headers (HSTS, CSP, `X-Frame-Options`, …). |
-| `maintenance-mode` | `ephpm-middleware-maintenance-mode` | Flip a tenant into a `503` holding page via a per-site KV flag — no redeploy (`Retry-After`; IP/path bypass; fails **open**). |
-| `ip-allowlist` | `ephpm-middleware-ip-allowlist` | Allow/deny requests by client IP against CIDR lists, fail-closed (`403`); deny beats allow. |
-| `request-id` | `ephpm-middleware-request-id` | **Request + response phase.** Give every request a correlation id: generate or honor an inbound `X-Request-Id`, inject it for PHP, and echo it on the response. |
-| `header-transform` | `ephpm-middleware-header-transform` | **Request + response phase.** Set request headers seen by PHP; set/remove response headers out. |
+Three modules, chosen to cover the range rather than every use case:
 
-> **No `compression` module.** Response-body compression is deliberately *not*
-> shipped as a middleware: ePHPm's core already compresses buffered responses
-> by default (`[server.response] compression`, **on**, brotli-then-gzip),
-> negotiating `Accept-Encoding` and running **before** the response phase — so
-> a middleware compressor would be redundant and inert on a stock server. Use
-> the built-in knob, not a module.
+| Example | Crate | Teaches |
+|---------|-------|---------|
+| `api-key` | `ephpm-middleware-api-key` | A **request-phase auth gate** that also **uses the KV store**: read a key from a header (or query param), validate it against a static map **or** a `kv_get` lookup with a constant-time compare, and forward the resolved consumer id to PHP — or short-circuit `401`. |
+| `redirect` | `ephpm-middleware-redirect` | The **simplest early-return**: compute a canonical URL (scheme / host / trailing slash) and emit a single `301`/`308`, or `CONTINUE`. No KV, no extra deps. |
+| `header-transform` | `ephpm-middleware-header-transform` | The **response phase**: `declare!(Type, response)`, setting request headers PHP sees *and* setting/removing response headers on the way out. |
 
-Per-module configuration keys are documented in each crate's module docs
-(`crates/ephpm-middleware-<name>/src/lib.rs` re-exports the implementation from
-`crates/ephpm-middleware-modules/src/<name>.rs`).
+Each crate's `src/lib.rs` is self-contained — implementation, module docs, unit
+tests, and the one `declare!` line that turns it into a loadable module — so you
+can read one file end to end.
 
-## ABI version
+## Anatomy of a module
 
-Every module is built against the ePHPm native-middleware **C ABI**, which is
-versioned; the **major byte** gates compatibility. A module built against ABI
-major *N* refuses to initialise in a host whose major is different — the check
-is baked into the module by `ephpm_middleware::declare!`.
+```rust
+use ephpm_middleware::{Middleware, Request, Response};
 
-- **Current ABI major: `1`** (`ephpm_middleware::abi::ABI_V1 = 0x0100_0000`).
-- The ABI/trait crate `ephpm-middleware` is **not** vendored here — it is the
-  shared contract owned by the ePHPm host. This repo depends on it by git `rev`
-  (see the root `Cargo.toml`), exactly the way ePHPm pins litewire, so every
-  module is provably built against one specific host-ABI commit. Bumping the
-  ABI means bumping that `rev` and cutting a new release.
-- Each release records its ABI major in `manifest.json` (below), so the CLI can
-  refuse an incompatible module **at download time**, before it is ever loaded.
+pub struct MyGate { /* config parsed once at init */ }
 
-## Releases: what the CLI consumes
+impl Middleware for MyGate {
+    // Parse `[[middleware]] config = { ... }` (as serde_json) once at startup.
+    // Return Err(msg) to fail the mount fast.
+    fn init(config: &serde_json::Value) -> Result<Self, String> { /* ... */ }
 
-Each release (tag `vX.Y.Z`) carries, per platform ePHPm ships:
+    // Run per request. Return one of the request-phase verdicts.
+    fn invoke(&self, req: &Request<'_>) -> Response {
+        if req.header("X-Token").is_none() {
+            return Response::respond(401, "missing token"); // short-circuit
+        }
+        Response::cont()                                    // let it through
+        // or Response::rewrite().header("X-Consumer", id)  // annotate for PHP
+    }
+}
 
-| Asset name | Meaning |
-|------------|---------|
-| `<name>.<platform>.<ext>` | The module cdylib for that platform. `<platform>` is `<os>-<arch>` with `macos`→`darwin` — e.g. `jwt.linux-x86_64.so`, `cors.darwin-aarch64.dylib`, `jwt.windows-x86_64.dll`. This is **exactly** the file name the host loader looks for when a mount says `library = "<name>"`. |
-| `<name>.linux-<arch>-musl.<ext>` | The musl build, for the rare fully-*dynamic* musl host. The loader has no libc distinction in its file names, so the CLI does **not** install this automatically — place it yourself with `ephpm middleware get <name> --dest <dir>` and mount it by explicit path. (A fully *static* musl binary cannot `dlopen` at all.) |
-| `SHA256SUMS` | `sha256sum`-format digest of every asset. **The integrity floor** — the CLI verifies a downloaded module against this before writing it to disk, and fails closed on a mismatch or a missing `SHA256SUMS`. |
-| `manifest.json` | `{ schema, abi_major, release, modules: [{ name, crate, describe, assets: [{ platform, libc, file, ext, sha256 }] }] }`. The CLI reads `abi_major` for the download-time compatibility gate and the module/asset list for `list` and platform→asset mapping. |
+// The ONE line that exports the C ABI entry points and bakes in the ABI-major
+// compatibility check. Without it you have a plain Rust type, not a module.
+ephpm_middleware::declare!(MyGate);
+```
 
-### Host loader search path (where the CLI drops files)
+To also transform the response, implement `ResponseMiddleware` and opt in with
+`declare!(MyGate, response)`:
 
-A bare `library = "<name>"` mount is resolved by the host, in each of the
-current working directory, `$EPHPM_MIDDLEWARE_DIR` (when set), and
-`/usr/local/lib/ephpm/middleware`, by trying:
+```rust
+use ephpm_middleware::{ResponseMiddleware, ResponseView};
 
-1. `<name>.<platform>.<ext>`  ← the release asset name; the CLI writes here
+impl ResponseMiddleware for MyGate {
+    fn invoke_response(&self, _req: &Request<'_>, resp: &mut ResponseView<'_>) {
+        resp.remove_header("X-Powered-By");
+        resp.set_header("X-Served-By", "ephpm");
+    }
+}
+```
+
+**KV access.** The request carries a handle to ePHPm's embedded KV store —
+`req.host().kv_get(key)`, `kv_set`, `kv_incr_ttl(key, by, ttl)` — the same
+gossip-replicated store PHP uses. See `api-key` for a real `kv_get` lookup.
+
+### The ABI is versioned
+
+Every module is built against ePHPm's native-middleware **C ABI**, whose **major
+byte** gates compatibility: `declare!` embeds the major, and a module built
+against a different host major refuses to initialise rather than corrupt memory
+at the FFI boundary (current major: `1`). The ABI/trait crate `ephpm-middleware`
+is **not** vendored here — it is the shared contract owned by the ePHPm host, so
+these examples depend on it by git `rev` (see the root `Cargo.toml`), pinned to
+one specific host commit exactly the way ePHPm pins litewire. To build against a
+newer host, bump that `rev` and `cargo update`.
+
+## Building a module
+
+```bash
+# The ephpm-middleware ABI crate is a git dependency; fetch via the git CLI so
+# host git rewrite rules apply.
+CARGO_NET_GIT_FETCH_WITH_CLI=true cargo build --release -p ephpm-middleware-redirect
+# → target/release/libephpm_middleware_redirect.so   (.dylib on macOS;
+#   ephpm_middleware_redirect.dll — no `lib` prefix — on Windows)
+```
+
+`cargo test --workspace` runs every example's unit tests. The `host` feature of
+`ephpm-middleware` and the embedded KV store are pulled in only as
+**dev-dependencies** (to fabricate a request and a real KV store in tests); the
+shipped cdylib needs neither.
+
+## Mounting a custom module
+
+Add a `[[middleware]]` block to your ePHPm config. `library` is resolved by
+ePHPm's loader ([`resolve_library`](https://github.com/ephpm/ephpm/blob/main/crates/ephpm-server/src/middleware.rs))
+against the **builtin registry first**, then the shared-library lane:
+
+```toml
+[[middleware]]
+# A value with a path separator OR a file extension is used as an explicit
+# path — the most predictable way to mount a module you just built:
+library = "/usr/local/lib/ephpm/middleware/my-gate.so"
+match   = "/api/*"     # optional glob; omit to run on every request
+order   = 20           # required; lower runs first
+config  = { header = "X-Token" }
+```
+
+Or drop the file into a search directory and mount it by **bare name**. A bare
+name (no separator, no extension) is resolved through the middleware search path
+— the current directory, `$EPHPM_MIDDLEWARE_DIR` (when set), and
+`/usr/local/lib/ephpm/middleware` — trying, in order:
+
+1. `<name>.<os>-<arch>.<ext>`  (e.g. `my-gate.linux-x86_64.so`)
 2. `lib<name>.<ext>`
 3. `<name>.<ext>`
 
-So `ephpm middleware get jwt` writes `jwt.<platform>.<ext>` into a search
-directory and `library = "jwt"` then resolves. Run `ephpm middleware
-search-path` to print the exact directories.
-
-## Building locally
-
-```bash
-# Fetch the ABI crate via the git CLI (handles host git rewrite rules).
-CARGO_NET_GIT_FETCH_WITH_CLI=true cargo build --release -p ephpm-middleware-jwt
-# → target/release/libephpm_middleware_jwt.so  (lib<name>.dll on Windows)
+```toml
+[[middleware]]
+library = "my-gate"    # resolves my-gate.linux-x86_64.so / libmy-gate.so / my-gate.so
+order   = 20
 ```
 
-`cargo test --workspace` runs the module unit tests plus the ratelimit
-fail-open integration test (these pull the `host` feature of `ephpm-middleware`
-and the embedded KV store as dev-dependencies; the shipped cdylibs need
-neither).
+> **Avoid the official names.** Because the builtin registry is consulted
+> first, naming your module `jwt`, `redirect`, `ratelimit`, etc. mounts the
+> **built-in** module, not yours. Give a custom module its own name (or mount it
+> by explicit path).
+
+The Linux release binaries are glibc-dynamic and can `dlopen` these modules;
+a custom fully-static build cannot, and would need the module compiled in
+instead.
 
 ## Layout
 
 ```
 crates/
-  ephpm-middleware-modules            rlib: the module impls as plain types, NO
-                                      C ABI exports (so they can all be linked
-                                      into one binary — the cdylib shells, or
-                                      ePHPm's `vendor-middleware` feature)
-  ephpm-middleware-api-key            cdylib shell: pub use + declare!(ApiKey)
-  ephpm-middleware-jwt                cdylib shell: pub use + declare!(Jwt)
-  ephpm-middleware-cors               cdylib shell
-  ephpm-middleware-ratelimit          cdylib shell
-  ephpm-middleware-redirect           cdylib shell
-  ephpm-middleware-security-headers   cdylib shell
-  ephpm-middleware-maintenance-mode   cdylib shell
-  ephpm-middleware-ip-allowlist       cdylib shell
-  ephpm-middleware-request-id         cdylib shell: declare!(RequestId, response)
-  ephpm-middleware-header-transform   cdylib shell: declare!(HeaderTransform, response)
+  ephpm-middleware-api-key            request-phase auth gate + KV  (declare!(ApiKey))
+  ephpm-middleware-redirect           canonical-URL redirect        (declare!(Redirect))
+  ephpm-middleware-header-transform   response phase                (declare!(HeaderTransform, response))
 ```
 
-The last two opt into the **response phase** with `declare!(Type, response)` —
-the host runs their `invoke_response` after the response is generated to
-transform it, in addition to their request phase.
+## CI
 
-The impl/shell split is deliberate: multiple crates each exporting the same
-`ephpm_middleware_*` symbols cannot be linked into one binary, so the
-implementations live symbol-free in `ephpm-middleware-modules` and each cdylib
-adds only the `declare!` exports. That same rlib is what ePHPm's off-by-default
-`vendor-middleware` feature compiles in when someone needs middleware in a
-fully-static (non-`dlopen`) build.
-
-## Releasing
-
-`.github/workflows/release.yml`:
-
-- **push a `v*` tag** → builds all modules for the full platform matrix
-  (linux x86_64/aarch64 × gnu+musl, macOS aarch64, windows x86_64) and
-  publishes the assets + `SHA256SUMS` + `manifest.json`.
-- **`workflow_dispatch`** → scriptable partial cut; `modules` and
-  `only_host_platform` subset the work (used to validate the pipeline with a
-  single module on one platform).
-
-All runners are **GitHub-hosted** — these modules are pure Rust and must not
-contend with ePHPm's self-hosted (ephemerd) fleet.
+`.github/workflows/ci.yml` runs fmt, clippy (pedantic, warnings-as-errors),
+tests, and a release build on every PR and push to main — so the examples don't
+rot. Runners are GitHub-hosted (pure Rust, no PHP SDK).
 
 ## License
 
