@@ -18,9 +18,9 @@
 //! The key is read from a configurable request header (default `X-Api-Key`)
 //! and, only when explicitly enabled, from a query parameter (default off —
 //! see the security note). It is validated against either a static
-//! `key → consumer-id` map baked into the config, a KV lookup (`kv_get` on a
-//! `kv_key_template` like `apikey:<key>` whose value is the consumer id), or
-//! both (the static map is consulted first). On success the module `REWRITE`s
+//! `key → consumer-id` map baked into the config, a KV lookup (`kv_get_global`
+//! on a `kv_key_template` like `apikey:<key>` whose value is the consumer id),
+//! or both (the static map is consulted first). On success the module `REWRITE`s
 //! the request, injecting the consumer id in a header (default
 //! `X-Consumer-Id`) that PHP reads — the exact mechanism `jwt` uses to forward
 //! claims. The injected header **overwrites** any same-named header the client
@@ -46,6 +46,43 @@
 //!   `key_headers` at the same header (e.g. `["X-Api-Key"]`) to get per-key
 //!   rate limiting in front of, or alongside, this auth gate.
 //!
+//! ## The credential map lives in the PROCESS-GLOBAL store (ABI minor 3)
+//!
+//! Since ePHPm [#376](https://github.com/ephpm/ephpm/issues/376) the host
+//! table's plain `kv_get` resolves **the serving vhost's** keyspace — the same
+//! physically separate store that tenant's PHP writes through `ephpm_kv_set()`.
+//! For a per-tenant counter that is exactly what you want. For a **credential
+//! map it is a privilege escalation**: on a multi-tenant node any tenant's PHP
+//! could write `apikey:<anything>` into its own store and mint itself a
+//! consumer identity that this gate would then honour.
+//!
+//! So the lookup here uses [`Host::kv_get_global`], the process-wide store,
+//! which no tenant's PHP can reach. That is also the pre-minor-3 behaviour, so
+//! nothing changes for an existing deployment — it just stays correct once the
+//! host starts scoping `kv_*` per vhost. Seed it out of band (the RESP listener
+//! or a control-plane process), not from a tenant's application code.
+//!
+//! Mounted on a host older than ABI minor 3 the global slot does not exist, the
+//! safe wrapper returns `None`, and the KV path therefore denies every request
+//! (the static `keys` map still works). Failing closed is the right direction
+//! for an auth gate, and the pinned `rev` in `Cargo.toml` makes it moot in
+//! practice.
+//!
+//! ## Per-tenant key maps: `<site>` and failing closed
+//!
+//! One mount serves every vhost, so a multi-tenant deployment usually wants one
+//! key map per tenant. Put the optional `<site>` placeholder in
+//! `kv_key_template` (`apikey:<site>:<key>`) and it is substituted with the
+//! request's **canonical site key** — [`Request::vhost_id`], the identity the
+//! router resolved, never the `Host` header a client sent
+//! ([#390](https://github.com/ephpm/ephpm/issues/390)).
+//!
+//! `vhost_id()` is `None` for a request that matched no virtual host, and this
+//! module then **denies** rather than substituting anything: an auth gate that
+//! guessed a site there would be keying policy on arbitrary client input. That
+//! is the fail-closed half of the pattern — a rate limiter, which only has to
+//! bucket, would instead use `ephpm_middleware::UNMATCHED_VHOST`.
+//!
 //! Configuration (`[[middleware]] config = { ... }`):
 //!
 //! | key | default | meaning |
@@ -53,16 +90,23 @@
 //! | `header` (string) | `"X-Api-Key"` | request header carrying the key |
 //! | `query_param` (string) | unset (disabled) | also accept the key from this query parameter — see the security note |
 //! | `keys` (object) | unset | static `key → consumer-id` map |
-//! | `kv_key_template` (string) | unset | KV lookup key with a `<key>` placeholder, e.g. `apikey:<key>`; the value is the consumer id |
+//! | `kv_key_template` (string) | unset | global-store lookup key with a required `<key>` placeholder and an optional `<site>` one, e.g. `apikey:<key>` or `apikey:<site>:<key>`; the value is the consumer id |
 //! | `consumer_header` (string) | `"X-Consumer-Id"` | header injected for PHP with the resolved consumer id |
 //!
 //! At least one of `keys` / `kv_key_template` must be configured.
+//!
+//! [`Host::kv_get_global`]: ephpm_middleware::Host::kv_get_global
 
 use ephpm_middleware::{Middleware, Request, Response};
 use subtle::ConstantTimeEq;
 
 /// The literal replaced with the presented key in `kv_key_template`.
 const KEY_PLACEHOLDER: &str = "<key>";
+
+/// The optional literal replaced with the request's canonical site key in
+/// `kv_key_template`. Its presence is what makes a key map per-tenant — and
+/// what makes a request with no tenant identity fail closed.
+const SITE_PLACEHOLDER: &str = "<site>";
 
 /// API-key validation policy, built once at `init`.
 pub struct ApiKey {
@@ -72,8 +116,27 @@ pub struct ApiKey {
     /// Static `key → consumer-id` entries. Keys are stored as bytes for the
     /// constant-time comparison.
     keys: Vec<(Vec<u8>, String)>,
-    /// KV lookup template containing [`KEY_PLACEHOLDER`], e.g. `apikey:<key>`.
+    /// KV lookup template containing [`KEY_PLACEHOLDER`], e.g. `apikey:<key>`,
+    /// and optionally [`SITE_PLACEHOLDER`], e.g. `apikey:<site>:<key>`.
     kv_key_template: Option<String>,
+}
+
+/// Outcome of the KV credential lookup.
+///
+/// The third variant exists so `invoke` can tell "this key is not in the store"
+/// apart from "this request has no tenant, so a per-tenant key map cannot even
+/// be addressed". Both deny — but only one of them is a statement about the
+/// presented credential, and collapsing them would hide the fail-closed branch
+/// this example exists to demonstrate.
+enum KvLookup {
+    /// The key resolved to this consumer id.
+    Consumer(String),
+    /// No KV template configured, or the key is absent from the store.
+    Miss,
+    /// The template is site-scoped (`<site>`) and [`Request::vhost_id`] is
+    /// `None` — the request matched no virtual host, so there is no tenant
+    /// whose key map could be consulted (ephpm#390).
+    NoTenant,
 }
 
 /// Constant-time byte-slice equality. Wraps [`subtle::ConstantTimeEq`] so the
@@ -159,12 +222,41 @@ impl ApiKey {
 
     /// Look the presented key up in the KV store via `kv_key_template`. The
     /// stored value (UTF-8, non-empty) is the consumer id.
-    fn match_kv(&self, req: &Request<'_>, presented: &str) -> Option<String> {
-        let template = self.kv_key_template.as_ref()?;
-        let lookup = template.replace(KEY_PLACEHOLDER, presented);
-        let value = req.host().kv_get(&lookup)?;
-        let consumer = String::from_utf8(value).ok()?;
-        (!consumer.is_empty()).then_some(consumer)
+    ///
+    /// Two deliberate choices, both explained at length in the module docs:
+    ///
+    /// * the lookup uses `kv_get_global`, so the credential map lives in the
+    ///   process-wide store where no tenant's PHP can write it;
+    /// * a `<site>`-scoped template resolves the site component from
+    ///   `req.vhost_id()` — the canonical site key — and **fails closed** when
+    ///   there is no tenant, instead of falling back to the `Host` header.
+    fn match_kv(&self, req: &Request<'_>, presented: &str) -> KvLookup {
+        let Some(template) = self.kv_key_template.as_ref() else {
+            return KvLookup::Miss;
+        };
+        let lookup = if template.contains(SITE_PLACEHOLDER) {
+            // Fail closed: no tenant identity, no per-tenant key map. Never
+            // substitute `req.http_host()` here — that is client input, and
+            // accepting it would let a caller pick which tenant's key map its
+            // credential is checked against.
+            let Some(site) = req.vhost_id() else {
+                return KvLookup::NoTenant;
+            };
+            // Site first, key second, and the order is load-bearing: the
+            // presented key is client input, so substituting it first would let
+            // a caller inject a literal `<site>` that the next `replace` then
+            // expanded. This way anything the client sends stays inert.
+            template.replace(SITE_PLACEHOLDER, site).replace(KEY_PLACEHOLDER, presented)
+        } else {
+            template.replace(KEY_PLACEHOLDER, presented)
+        };
+        let Some(value) = req.host().kv_get_global(&lookup) else {
+            return KvLookup::Miss;
+        };
+        match String::from_utf8(value) {
+            Ok(consumer) if !consumer.is_empty() => KvLookup::Consumer(consumer),
+            _ => KvLookup::Miss,
+        }
     }
 
     /// Admit the request, injecting the consumer id for PHP (mirrors how `jwt`
@@ -237,10 +329,11 @@ impl Middleware for ApiKey {
         if let Some(consumer) = self.match_static(key.as_bytes()) {
             return self.grant(consumer);
         }
-        if let Some(consumer) = self.match_kv(req, &key) {
-            return self.grant(&consumer);
+        match self.match_kv(req, &key) {
+            KvLookup::Consumer(consumer) => self.grant(&consumer),
+            KvLookup::NoTenant => self.unauthorized("unknown host"),
+            KvLookup::Miss => self.unauthorized("invalid api key"),
         }
-        self.unauthorized("invalid api key")
     }
 }
 
@@ -265,12 +358,20 @@ mod tests {
         ApiKey::init(&config).expect("init")
     }
 
-    /// Invoke with headers and an optional query string against a fresh ctx.
-    fn invoke_q(mw: &ApiKey, query: &str, headers: &[(String, String)]) -> Response {
-        let ctx = RequestCtx::new("GET", "/api/x", query, "203.0.113.9", "example.test", headers);
+    /// Invoke against a fresh ctx bound to `site` — the fifth `RequestCtx`
+    /// argument is the request's **canonical site key** since ABI minor 3, and
+    /// the empty string is how the host says "this request matched no virtual
+    /// host" (the C accessor turns it into a NULL, so `vhost_id()` is `None`).
+    fn invoke_on(mw: &ApiKey, site: &str, query: &str, headers: &[(String, String)]) -> Response {
+        let ctx = RequestCtx::new("GET", "/api/x", query, "203.0.113.9", site, headers);
         // SAFETY: `ctx` outlives the view; host_table() is 'static.
         let req = unsafe { Request::from_raw(ctx.as_abi(), host_table()) };
         mw.invoke(&req)
+    }
+
+    /// Invoke with headers and an optional query string against a fresh ctx.
+    fn invoke_q(mw: &ApiKey, query: &str, headers: &[(String, String)]) -> Response {
+        invoke_on(mw, "example", query, headers)
     }
 
     fn invoke(mw: &ApiKey, headers: &[(String, String)]) -> Response {
@@ -283,14 +384,27 @@ mod tests {
 
     /// Wire a real in-memory Store into the host table (first call wins; all
     /// tests in this binary share it) and seed one `apikey:*` entry via the
-    /// host's own `kv_set`.
+    /// host's own `kv_set_global`.
+    ///
+    /// **Every test must seed key names no other test uses.** The store is
+    /// process-wide and the tests run in parallel; `Store::set_local` removes
+    /// the old entry before inserting the new one, so two tests writing the
+    /// *same* key leave a window in which a third read sees a miss. Isolating
+    /// the key names removes the interference rather than papering over it.
     fn setup_kv_with(entries: &[(&str, &str)]) {
         set_kv_store(&ephpm_kv::store::Store::new(ephpm_kv::store::StoreConfig::default()));
         let ctx = RequestCtx::new("GET", "/", "", "127.0.0.1", "seed", &[]);
         // SAFETY: `ctx` outlives the view; host_table() is 'static.
         let req = unsafe { Request::from_raw(ctx.as_abi(), host_table()) };
         for (k, v) in entries {
-            assert!(req.host().kv_set(k, v.as_bytes(), 0), "seed kv_set failed for {k}");
+            // `kv_set_global` on purpose: this seeds the PROCESS-GLOBAL store,
+            // which is the one `match_kv` reads. (In-process there is no site
+            // scope active here either way, but naming the slot keeps the test
+            // honest about which store the module depends on.)
+            assert!(
+                req.host().kv_set_global(k, v.as_bytes(), 0),
+                "seed kv_set_global failed for {k}",
+            );
         }
     }
 
@@ -433,5 +547,77 @@ mod tests {
             consumer_header(&invoke(&mw, &hdr("X-Api-Key", "kv-only"))).as_deref(),
             Some("from-kv"),
         );
+    }
+
+    /// ePHPm #390 / #376. A `<site>`-scoped template gives each tenant its own
+    /// key map, keyed by the CANONICAL site key — so the same presented key is
+    /// a different credential on a different vhost, and neither tenant can
+    /// spend the other's.
+    #[test]
+    fn a_site_scoped_template_keys_the_map_per_tenant() {
+        setup_kv_with(&[
+            ("apikey:blog:shared-secret", "blog-consumer"),
+            ("apikey:shop:shared-secret", "shop-consumer"),
+            ("apikey:blog:blog-only", "blog-consumer"),
+        ]);
+        let mw = api_key(serde_json::json!({ "kv_key_template": "apikey:<site>:<key>" }));
+
+        let key = hdr("X-Api-Key", "shared-secret");
+        assert_eq!(
+            consumer_header(&invoke_on(&mw, "blog", "", &key)).as_deref(),
+            Some("blog-consumer"),
+        );
+        assert_eq!(
+            consumer_header(&invoke_on(&mw, "shop", "", &key)).as_deref(),
+            Some("shop-consumer"),
+        );
+
+        // A key that only exists in `blog`'s map is not a credential on `shop`.
+        let blog_only = hdr("X-Api-Key", "blog-only");
+        assert_eq!(
+            consumer_header(&invoke_on(&mw, "blog", "", &blog_only)).as_deref(),
+            Some("blog-consumer"),
+        );
+        assert_401(&invoke_on(&mw, "shop", "", &blog_only), "invalid api key");
+    }
+
+    /// The fail-closed half of ePHPm #390: a request that matched no virtual
+    /// host has no tenant identity (`vhost_id()` is `None`), and a site-scoped
+    /// gate must deny rather than invent one from the `Host` header.
+    #[test]
+    fn a_site_scoped_template_fails_closed_on_an_unmatched_host() {
+        setup_kv_with(&[
+            ("apikey:blog:closed-secret", "blog-consumer"),
+            ("apikey::closed-secret", "nope"),
+        ]);
+        let mw = api_key(serde_json::json!({ "kv_key_template": "apikey:<site>:<key>" }));
+
+        // Sanity: the credential itself is good on the vhost that owns it.
+        assert_eq!(
+            consumer_header(&invoke_on(&mw, "blog", "", &hdr("X-Api-Key", "closed-secret")))
+                .as_deref(),
+            Some("blog-consumer"),
+        );
+        // Empty site key == no vhost matched == `vhost_id() == None`. Denied,
+        // and denied as "unknown host" — the gate never reached the store.
+        // Note `apikey::closed-secret` IS seeded: an empty site component is
+        // not a bucket this can fall into, it is a refusal to look at all.
+        assert_401(&invoke_on(&mw, "", "", &hdr("X-Api-Key", "closed-secret")), "unknown host");
+    }
+
+    /// A template with no `<site>` stays node-wide, and is unaffected by which
+    /// vhost is serving — the pre-minor-3 shape, kept working.
+    #[test]
+    fn a_template_without_site_is_node_wide() {
+        setup_kv_with(&[("apikey:node-wide-key", "node-wide-consumer")]);
+        let mw = api_key(serde_json::json!({ "kv_key_template": "apikey:<key>" }));
+        for site in ["blog", "shop", ""] {
+            assert_eq!(
+                consumer_header(&invoke_on(&mw, site, "", &hdr("X-Api-Key", "node-wide-key")))
+                    .as_deref(),
+                Some("node-wide-consumer"),
+                "site {site:?} should reach the node-wide key map",
+            );
+        }
     }
 }

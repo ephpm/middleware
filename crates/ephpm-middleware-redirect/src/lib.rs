@@ -27,17 +27,42 @@
 //! | `status` (integer) | `308` | redirect status — `301` or `308`; `308` preserves the request method |
 //! | `forwarded_proto_header` (string) | `"X-Forwarded-Proto"` | header the current scheme is derived from |
 //!
-//! **Scheme derivation.** The v1 middleware ABI exposes no request scheme or
-//! "is secure" flag, so the current scheme is read from
+//! **Scheme derivation.** The current scheme is read from
 //! `forwarded_proto_header` (default `X-Forwarded-Proto`); a request with no
 //! such header is treated as `http`. Behind a TLS-terminating proxy the proxy
 //! **must** set that header, or `force_https` would redirect an
 //! already-secure request and loop — the same requirement nginx/Traefik place
 //! on the operator.
 //!
+//! ABI minor 2 added `req.scheme()` / `req.is_secure()`, which report the
+//! scheme of the connection **as ePHPm terminated it**. That is the better
+//! source when ePHPm itself is the TLS endpoint, and the wrong one when a proxy
+//! in front of it terminated TLS and forwarded cleartext — where the connection
+//! really is `http` and only the forwarded header knows better. This example
+//! keeps the header-derived form so it works in both topologies; a deployment
+//! that terminates TLS in ePHPm can simplify it to `req.is_secure()` and drop
+//! the `forwarded_proto_header` knob (and with it the trust assumption).
+//!
 //! **Scope.** Config is per-mount (there is no per-vhost config idiom in the
 //! ABI). Use `host_map` to canonicalize several hosts from one mount; the
 //! request's own `Host` header is what every rule is computed against.
+//!
+//! **Why `Host`, and not `req.vhost_id()`.** This module is the one place in
+//! this repo where reading the client's `Host` is the *correct* choice, so it
+//! is worth being explicit about the distinction ABI minor 3 draws
+//! ([ephpm#390](https://github.com/ephpm/ephpm/issues/390)):
+//!
+//! * `req.vhost_id()` is the **tenant identity** — the canonical site key the
+//!   router resolved, `None` when the request matched no virtual host. Use it
+//!   for anything that decides *policy* (which credentials apply, whose budget
+//!   is spent, whose data is read).
+//! * `req.header("Host")` / `req.http_host()` is **what the client asked for**.
+//!   A canonicalizing redirect exists precisely to rewrite that, so it has to
+//!   read it — and it must not be treated as a tenant identity.
+//!
+//! This module deliberately uses the raw header rather than the normalized
+//! `req.http_host()` accessor (minor 2), because the `Location` it builds has
+//! to preserve the request's port, which the normalized form strips.
 
 use ephpm_middleware::{Middleware, Request, Response};
 
