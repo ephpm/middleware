@@ -45,7 +45,7 @@ Four modules, chosen to cover the range rather than every use case:
 | Example | Crate | Teaches |
 |---------|-------|---------|
 | `basic-auth` | `ephpm-middleware-basic-auth` | The **simplest whole-site auth gate**: verify an `Authorization: Basic` credential (RFC 7617) with a constant-time compare, `401` + `WWW-Authenticate` otherwise. No KV. Gates static assets and PHP alike (ePHPm #408/#395). Start here. |
-| `api-key` | `ephpm-middleware-api-key` | A **request-phase auth gate** that also **uses the KV store**: read a key from a header (or query param), validate it against a static map **or** a `kv_get` lookup with a constant-time compare, and forward the resolved consumer id to PHP — or short-circuit `401`. |
+| `api-key` | `ephpm-middleware-api-key` | A **request-phase auth gate** that also **uses the KV store**: read a key from a header (or query param), validate it against a static map **or** a `kv_get_global` lookup with a constant-time compare, and forward the resolved consumer id to PHP — or short-circuit `401`. Also the **multi-tenancy** example: an optional `<site>` in the KV key template scopes the credential map per tenant, and fails closed when the request matched no vhost. |
 | `redirect` | `ephpm-middleware-redirect` | The **simplest early-return**: compute a canonical URL (scheme / host / trailing slash) and emit a single `301`/`308`, or `CONTINUE`. No KV, no extra deps. |
 | `header-transform` | `ephpm-middleware-header-transform` | The **response phase**: `declare!(Type, response)`, setting request headers PHP sees *and* setting/removing response headers on the way out. |
 
@@ -96,18 +96,73 @@ impl ResponseMiddleware for MyGate {
 
 **KV access.** The request carries a handle to ePHPm's embedded KV store —
 `req.host().kv_get(key)`, `kv_set`, `kv_incr_ttl(key, by, ttl)` — the same
-gossip-replicated store PHP uses. See `api-key` for a real `kv_get` lookup.
+gossip-replicated store PHP uses. Since ABI minor 3 those resolve **the serving
+vhost's** keyspace, and `kv_get_global` / `kv_set_global` / `kv_incr_ttl_global`
+resolve the process-wide store; see [Tenancy](#tenancy-vhost_id-and-kv-scope)
+below. `api-key` shows both.
+
+### Tenancy: `vhost_id()` and KV scope
+
+One mount serves every vhost, so a module on a multi-tenant node
+(`[server] sites_dir`) has to decide *whose* request it is looking at. Two rules
+carry all of it:
+
+**1. `req.vhost_id()` is the tenant identity; the `Host` header is not.** It
+returns `Option<&str>` — the **canonical site key** the router resolved, which
+is the same identity that picks the request's per-site database, KV keyspace and
+OPcache vhost. It is normalized by the router, so `Site.Example`,
+`site.example:8080` and `site.example.` are one key, and a configured
+`sites_domain_suffix` is already stripped.
+
+`None` means the request matched **no** virtual host. That is a decision, not a
+missing value: ePHPm serves unrecognised hosts from the default document root,
+so `req.http_host()` there is arbitrary client input. Two correct ways to handle
+it, and no third:
+
+```rust
+// Auth gate — fail closed. No tenant, no policy.
+let Some(site) = req.vhost_id() else {
+    return Response::respond(404, "unknown host");
+};
+
+// Rate limiter / counter — one deliberate bucket, never one per Host value.
+let site = req.vhost_id().unwrap_or(ephpm_middleware::UNMATCHED_VHOST);
+```
+
+Substituting the header instead hands a caller a fresh keyspace — and a fresh
+rate-limit budget — per `Host` they invent. That was ePHPm
+[#390](https://github.com/ephpm/ephpm/issues/390). Use `req.http_host()` only
+when you genuinely want the host as sent (a canonical-host redirect, a log
+line); `redirect` is the example of that.
+
+**2. `kv_*` is per-tenant, `kv_*_global` is node-wide.** Since ePHPm
+[#376](https://github.com/ephpm/ephpm/issues/376) the plain `kv_*` callbacks
+resolve the serving vhost's own store — the same one that tenant's PHP writes
+through `ephpm_kv_set()`. A counter or flag is therefore per-tenant with no key
+prefixing, and a module can share a key with the app it fronts. But **anything a
+tenant must not be able to forge belongs in `kv_*_global`**: a credential map in
+the per-site store is writable by that site's own PHP. `api-key` puts its map in
+the global store for exactly that reason.
+
+On a single-site node there is one store and the two are the same thing.
 
 ### The ABI is versioned
 
 Every module is built against ePHPm's native-middleware **C ABI**, whose **major
 byte** gates compatibility: `declare!` embeds the major, and a module built
 against a different host major refuses to initialise rather than corrupt memory
-at the FFI boundary (current major: `1`). The ABI/trait crate `ephpm-middleware`
-is **not** vendored here — it is the shared contract owned by the ePHPm host, so
-these examples depend on it by git `rev` (see the root `Cargo.toml`), pinned to
-one specific host commit exactly the way ePHPm pins litewire. To build against a
-newer host, bump that `rev` and `cargo update`.
+at the FFI boundary (current major: `1`). The lower three bytes are an additive
+**minor** level; these examples are built against **minor 3**
+(`0x0100_0003`) — minor 1 added the response phase, minor 2 the
+scheme/`is_secure`/normalized-host request accessors and a real request body,
+and minor 3 the process-global KV slots plus the two redefinitions described
+under [Tenancy](#tenancy-vhost_id-and-kv-scope).
+
+The ABI/trait crate `ephpm-middleware` is **not** vendored here — it is the
+shared contract owned by the ePHPm host, so these examples depend on it by git
+`rev` (see the root `Cargo.toml`), pinned to one specific host commit exactly the
+way ePHPm pins litewire. To build against a newer host, bump that `rev` and
+`cargo update`.
 
 ## Building a module
 

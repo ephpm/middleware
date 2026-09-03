@@ -21,16 +21,35 @@ repository = "https://github.com/ephpm/middleware-examples"
 # rebuild these examples against a newer host, replace `rev` and run
 # `cargo update`.
 #
-# Pinned at ePHPm main `e63284838d07d348e2155e76916daaf9782c012b` — the merge of
-# #408, which added the response-phase ABI hook (`ResponseMiddleware` /
-# `declare!(Type, response)` / the `ResponseView` accessors) the
-# header-transform example builds on.
-ephpm-middleware = { git = "https://github.com/ephpm/ephpm.git", rev = "e63284838d07d348e2155e76916daaf9782c012b" }
+# Pinned at ePHPm `c2774ab61b9d25b835282b2f70281fb45e11334d` — the commit
+# tagged **v0.8.9**, the first published release carrying ephpm#448 (merged to
+# main as `691e6fefa702e8f2a695af85377164866eedfbc5`), which took the ABI to
+# **minor 3**. The rev is the released tag's commit rather than the tag name so
+# the pin is immutable, and rather than the raw merge commit so these examples
+# are provably built against an ABI that actually shipped in a host binary
+# operators can run. Two things these examples care about landed there
+# (ephpm#449 tracks this bump):
+#
+#   * `Request::vhost_id()` returns `Option<&str>`: the router's CANONICAL SITE
+#     KEY, and `None` for a host that matched no virtual host — where it used to
+#     return the raw `Host` header and could never be absent. It is a tenant
+#     identity now, so a gate can fail closed on `None` instead of keying policy
+#     on a client-supplied string (ephpm#390).
+#   * The host table's `kv_*` callbacks resolve THE SERVING VHOST'S keyspace
+#     rather than the process-global store (ephpm#376). The appended
+#     `kv_*_global` slots reach the process-wide store, which is where
+#     operator-owned state — such as `api-key`'s credential map — has to live on
+#     a multi-tenant node, because no tenant's PHP can write there.
+#
+# The previous pin was `e63284838d07d348e2155e76916daaf9782c012b` (#408, the
+# response-phase hook the header-transform example builds on); everything from
+# that rev is still present, since ABI growth is additive within major 1.
+ephpm-middleware = { git = "https://github.com/ephpm/ephpm.git", rev = "c2774ab61b9d25b835282b2f70281fb45e11334d" }
 # Test-only: the same embedded KV store the host wires into the middleware host
 # table, so the api-key and ratelimit examples exercise the real KV path in
 # their unit tests. Same rev as the ABI crate so both resolve to one crate
 # instance and the `Store` type matches `ephpm_middleware::host::set_kv_store`.
-ephpm-kv = { git = "https://github.com/ephpm/ephpm.git", rev = "e63284838d07d348e2155e76916daaf9782c012b" }
+ephpm-kv = { git = "https://github.com/ephpm/ephpm.git", rev = "c2774ab61b9d25b835282b2f70281fb45e11334d" }
 
 # Every example parses its config out of a `serde_json::Value`.
 serde_json = "1"
