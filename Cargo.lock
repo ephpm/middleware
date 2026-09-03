@@ -172,7 +172,7 @@ dependencies = [
 [[package]]
 name = "ephpm-config"
 version = "0.1.0"
-source = "git+https://github.com/ephpm/ephpm.git?rev=21a7c8a7832b62d0ab8af960931a33e8e9778784#21a7c8a7832b62d0ab8af960931a33e8e9778784"
+source = "git+https://github.com/ephpm/ephpm.git?rev=c2774ab61b9d25b835282b2f70281fb45e11334d#c2774ab61b9d25b835282b2f70281fb45e11334d"
 dependencies = [
  "figment",
  "serde",
@@ -184,7 +184,7 @@ dependencies = [
 [[package]]
 name = "ephpm-kv"
 version = "0.1.0"
-source = "git+https://github.com/ephpm/ephpm.git?rev=21a7c8a7832b62d0ab8af960931a33e8e9778784#21a7c8a7832b62d0ab8af960931a33e8e9778784"
+source = "git+https://github.com/ephpm/ephpm.git?rev=c2774ab61b9d25b835282b2f70281fb45e11334d#c2774ab61b9d25b835282b2f70281fb45e11334d"
 dependencies = [
  "anyhow",
  "brotli",
@@ -205,7 +205,7 @@ dependencies = [
 [[package]]
 name = "ephpm-middleware"
 version = "0.1.0"
-source = "git+https://github.com/ephpm/ephpm.git?rev=21a7c8a7832b62d0ab8af960931a33e8e9778784#21a7c8a7832b62d0ab8af960931a33e8e9778784"
+source = "git+https://github.com/ephpm/ephpm.git?rev=c2774ab61b9d25b835282b2f70281fb45e11334d#c2774ab61b9d25b835282b2f70281fb45e11334d"
 dependencies = [
  "ephpm-kv",
  "serde_json",
